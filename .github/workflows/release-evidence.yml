@@ -78,13 +78,18 @@ jobs:
           workflow_id="$(jq -r .id <<<"${workflow_json}")"
           [[ "${workflow_id}" =~ ^[0-9]+$ ]]
 
-          runs_json="$(gh api \
-            "repos/${GITHUB_REPOSITORY}/actions/workflows/${workflow_id}/runs?event=push&status=success&per_page=100")"
-          run_id="$(WORKFLOW_RUNS="${runs_json}" TARGET_SHA="${target_sha}" python - <<'PY'
+          runs_file="${RUNNER_TEMP}/required-workflow-runs.json"
+          gh api \
+            "repos/${GITHUB_REPOSITORY}/actions/workflows/${workflow_id}/runs?event=push&status=success&per_page=100" \
+            > "${runs_file}"
+          run_id="$(WORKFLOW_RUNS_FILE="${runs_file}" TARGET_SHA="${target_sha}" python - <<'PY'
           import json
           import os
+          from pathlib import Path
 
-          rows = json.loads(os.environ["WORKFLOW_RUNS"]).get("workflow_runs", [])
+          rows = json.loads(
+              Path(os.environ["WORKFLOW_RUNS_FILE"]).read_text()
+          ).get("workflow_runs", [])
           matches = [
               row
               for row in rows
@@ -102,11 +107,14 @@ jobs:
           )"
           [[ "${run_id}" =~ ^[0-9]+$ ]]
 
-          jobs_json="$(gh api \
-            "repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}/jobs?per_page=100")"
-          WORKFLOW_JOBS="${jobs_json}" TARGET_SHA="${target_sha}" python - <<'PY'
+          jobs_file="${RUNNER_TEMP}/required-workflow-jobs.json"
+          gh api \
+            "repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}/jobs?per_page=100" \
+            > "${jobs_file}"
+          WORKFLOW_JOBS_FILE="${jobs_file}" TARGET_SHA="${target_sha}" python - <<'PY'
           import json
           import os
+          from pathlib import Path
 
           required = {
               "test (ubuntu-latest, 3.11)",
@@ -118,7 +126,9 @@ jobs:
               "dependency-audit",
               "workflow-security",
           }
-          rows = json.loads(os.environ["WORKFLOW_JOBS"]).get("jobs", [])
+          rows = json.loads(
+              Path(os.environ["WORKFLOW_JOBS_FILE"]).read_text()
+          ).get("jobs", [])
           actual = {row.get("name") for row in rows}
           if actual != required:
               raise SystemExit(
