@@ -308,12 +308,12 @@ jobs:
                 },
                 resolvedDependencies: [
                   {
-                    uri: ("git+https://github.com/" + $repository + "@refs/tags/" + $release_tag),
-                    digest: {gitCommit: $target_sha}
-                  },
-                  {
                     uri: ("git+https://github.com/" + $repository + "@" + $workflow_git_ref),
                     digest: {gitCommit: $workflow_sha}
+                  },
+                  {
+                    uri: ("git+https://github.com/" + $repository + "@refs/tags/" + $release_tag),
+                    digest: {gitCommit: $target_sha}
                   }
                 ]
               },
@@ -483,12 +483,12 @@ jobs:
                 },
                 resolvedDependencies: [
                   {
-                    uri: ("git+https://github.com/" + $repository + "@refs/tags/" + $release_tag),
-                    digest: {gitCommit: $target_sha}
-                  },
-                  {
                     uri: ("git+https://github.com/" + $repository + "@" + $workflow_git_ref),
                     digest: {gitCommit: $workflow_sha}
+                  },
+                  {
+                    uri: ("git+https://github.com/" + $repository + "@refs/tags/" + $release_tag),
+                    digest: {gitCommit: $target_sha}
                   }
                 ]
               },
