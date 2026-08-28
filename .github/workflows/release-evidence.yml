@@ -253,6 +253,9 @@ jobs:
       RELEASE_TARGET_SHA: ${{ needs.build.outputs.target_sha }}
       WORKFLOW_CONFIG_REF: ${{ github.workflow_ref }}
       WORKFLOW_CONFIG_SHA: ${{ github.workflow_sha }}
+      REPOSITORY_ID: ${{ github.repository_id }}
+      REPOSITORY_OWNER_ID: ${{ github.repository_owner_id }}
+      RUNNER_ENVIRONMENT: github-hosted
     steps:
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
@@ -264,32 +267,43 @@ jobs:
           workflow_git_ref="${WORKFLOW_CONFIG_REF##*@}"
           [[ "${workflow_git_ref}" == refs/heads/* || "${workflow_git_ref}" == refs/tags/* ]]
           jq -n \
-            --arg build_type "https://github.com/${GITHUB_REPOSITORY}/blob/${WORKFLOW_CONFIG_SHA}/docs/RELEASE-RESUME-PROVENANCE.md" \
             --arg repository "${GITHUB_REPOSITORY}" \
             --arg release_tag "${RELEASE_TAG}" \
             --arg target_sha "${RELEASE_TARGET_SHA}" \
-            --arg workflow_ref "${WORKFLOW_CONFIG_REF}" \
             --arg workflow_git_ref "${workflow_git_ref}" \
             --arg workflow_sha "${WORKFLOW_CONFIG_SHA}" \
+            --arg run_source_ref "${GITHUB_REF}" \
+            --arg event_name "${GITHUB_EVENT_NAME}" \
+            --arg repository_id "${REPOSITORY_ID}" \
+            --arg repository_owner_id "${REPOSITORY_OWNER_ID}" \
+            --arg runner_environment "${RUNNER_ENVIRONMENT}" \
             --arg invocation "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${GITHUB_RUN_ATTEMPT}" \
             '{
               buildDefinition: {
-                buildType: $build_type,
+                buildType: "https://actions.github.io/buildtypes/workflow/v1",
                 externalParameters: {
-                  releaseTag: $release_tag,
-                  workflowRef: $workflow_ref
+                  workflow: {
+                    ref: $run_source_ref,
+                    repository: ("https://github.com/" + $repository),
+                    path: ".github/workflows/release-evidence.yml"
+                  }
                 },
-                internalParameters: {},
+                internalParameters: {
+                  github: {
+                    event_name: $event_name,
+                    repository_id: $repository_id,
+                    repository_owner_id: $repository_owner_id,
+                    runner_environment: $runner_environment
+                  }
+                },
                 resolvedDependencies: [
                   {
                     uri: ("git+https://github.com/" + $repository + "@refs/tags/" + $release_tag),
-                    digest: {gitCommit: $target_sha},
-                    annotations: {"dailyaiagents_role": "release-source"}
+                    digest: {gitCommit: $target_sha}
                   },
                   {
                     uri: ("git+https://github.com/" + $repository + "@" + $workflow_git_ref),
-                    digest: {gitCommit: $workflow_sha},
-                    annotations: {"dailyaiagents_role": "release-workflow"}
+                    digest: {gitCommit: $workflow_sha}
                   }
                 ]
               },
@@ -345,10 +359,26 @@ jobs:
               ),
               "digest": {"gitCommit": os.environ["WORKFLOW_CONFIG_SHA"]},
           }
-          expected_build_type = (
-              "https://github.com/"
-              f"{os.environ['GITHUB_REPOSITORY']}/blob/{os.environ['WORKFLOW_CONFIG_SHA']}"
-              "/docs/RELEASE-RESUME-PROVENANCE.md"
+          expected_build_type = "https://actions.github.io/buildtypes/workflow/v1"
+          expected_external_parameters = {
+              "workflow": {
+                  "ref": os.environ["GITHUB_REF"],
+                  "repository": f"https://github.com/{os.environ['GITHUB_REPOSITORY']}",
+                  "path": ".github/workflows/release-evidence.yml",
+              }
+          }
+          expected_internal_parameters = {
+              "github": {
+                  "event_name": os.environ["GITHUB_EVENT_NAME"],
+                  "repository_id": os.environ["REPOSITORY_ID"],
+                  "repository_owner_id": os.environ["REPOSITORY_OWNER_ID"],
+                  "runner_environment": os.environ["RUNNER_ENVIRONMENT"],
+              }
+          }
+          expected_builder = {"id": f"{os.environ['GITHUB_SERVER_URL']}/{os.environ['WORKFLOW_CONFIG_REF']}"}
+          expected_invocation = (
+              f"{os.environ['GITHUB_SERVER_URL']}/{os.environ['GITHUB_REPOSITORY']}"
+              f"/actions/runs/{os.environ['GITHUB_RUN_ID']}/attempts/{os.environ['GITHUB_RUN_ATTEMPT']}"
           )
           predicates = [row["verificationResult"]["statement"]["predicate"] for row in rows]
           def contains(dependencies, expected):
@@ -361,10 +391,12 @@ jobs:
           if not any(
               predicate.get("buildDefinition", {}).get("buildType") == expected_build_type
               and predicate.get("buildDefinition", {}).get("externalParameters")
-              == {
-                  "releaseTag": os.environ["RELEASE_TAG"],
-                  "workflowRef": os.environ["WORKFLOW_CONFIG_REF"],
-              }
+              == expected_external_parameters
+              and predicate.get("buildDefinition", {}).get("internalParameters")
+              == expected_internal_parameters
+              and predicate.get("runDetails", {}).get("builder") == expected_builder
+              and predicate.get("runDetails", {}).get("metadata")
+              == {"invocationId": expected_invocation}
               and contains(
                   predicate.get("buildDefinition", {}).get("resolvedDependencies", []),
                   expected_source,
@@ -396,6 +428,9 @@ jobs:
       RELEASE_TARGET_SHA: ${{ needs.build.outputs.target_sha }}
       WORKFLOW_CONFIG_REF: ${{ github.workflow_ref }}
       WORKFLOW_CONFIG_SHA: ${{ github.workflow_sha }}
+      REPOSITORY_ID: ${{ github.repository_id }}
+      REPOSITORY_OWNER_ID: ${{ github.repository_owner_id }}
+      RUNNER_ENVIRONMENT: github-hosted
     steps:
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
@@ -407,32 +442,43 @@ jobs:
           workflow_git_ref="${WORKFLOW_CONFIG_REF##*@}"
           [[ "${workflow_git_ref}" == refs/heads/* || "${workflow_git_ref}" == refs/tags/* ]]
           jq -n \
-            --arg build_type "https://github.com/${GITHUB_REPOSITORY}/blob/${WORKFLOW_CONFIG_SHA}/docs/RELEASE-RESUME-PROVENANCE.md" \
             --arg repository "${GITHUB_REPOSITORY}" \
             --arg release_tag "${RELEASE_TAG}" \
             --arg target_sha "${RELEASE_TARGET_SHA}" \
-            --arg workflow_ref "${WORKFLOW_CONFIG_REF}" \
             --arg workflow_git_ref "${workflow_git_ref}" \
             --arg workflow_sha "${WORKFLOW_CONFIG_SHA}" \
+            --arg run_source_ref "${GITHUB_REF}" \
+            --arg event_name "${GITHUB_EVENT_NAME}" \
+            --arg repository_id "${REPOSITORY_ID}" \
+            --arg repository_owner_id "${REPOSITORY_OWNER_ID}" \
+            --arg runner_environment "${RUNNER_ENVIRONMENT}" \
             --arg invocation "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${GITHUB_RUN_ATTEMPT}" \
             '{
               buildDefinition: {
-                buildType: $build_type,
+                buildType: "https://actions.github.io/buildtypes/workflow/v1",
                 externalParameters: {
-                  releaseTag: $release_tag,
-                  workflowRef: $workflow_ref
+                  workflow: {
+                    ref: $run_source_ref,
+                    repository: ("https://github.com/" + $repository),
+                    path: ".github/workflows/release-evidence.yml"
+                  }
                 },
-                internalParameters: {},
+                internalParameters: {
+                  github: {
+                    event_name: $event_name,
+                    repository_id: $repository_id,
+                    repository_owner_id: $repository_owner_id,
+                    runner_environment: $runner_environment
+                  }
+                },
                 resolvedDependencies: [
                   {
                     uri: ("git+https://github.com/" + $repository + "@refs/tags/" + $release_tag),
-                    digest: {gitCommit: $target_sha},
-                    annotations: {"dailyaiagents_role": "release-source"}
+                    digest: {gitCommit: $target_sha}
                   },
                   {
                     uri: ("git+https://github.com/" + $repository + "@" + $workflow_git_ref),
-                    digest: {gitCommit: $workflow_sha},
-                    annotations: {"dailyaiagents_role": "release-workflow"}
+                    digest: {gitCommit: $workflow_sha}
                   }
                 ]
               },
@@ -488,10 +534,26 @@ jobs:
               ),
               "digest": {"gitCommit": os.environ["WORKFLOW_CONFIG_SHA"]},
           }
-          expected_build_type = (
-              "https://github.com/"
-              f"{os.environ['GITHUB_REPOSITORY']}/blob/{os.environ['WORKFLOW_CONFIG_SHA']}"
-              "/docs/RELEASE-RESUME-PROVENANCE.md"
+          expected_build_type = "https://actions.github.io/buildtypes/workflow/v1"
+          expected_external_parameters = {
+              "workflow": {
+                  "ref": os.environ["GITHUB_REF"],
+                  "repository": f"https://github.com/{os.environ['GITHUB_REPOSITORY']}",
+                  "path": ".github/workflows/release-evidence.yml",
+              }
+          }
+          expected_internal_parameters = {
+              "github": {
+                  "event_name": os.environ["GITHUB_EVENT_NAME"],
+                  "repository_id": os.environ["REPOSITORY_ID"],
+                  "repository_owner_id": os.environ["REPOSITORY_OWNER_ID"],
+                  "runner_environment": os.environ["RUNNER_ENVIRONMENT"],
+              }
+          }
+          expected_builder = {"id": f"{os.environ['GITHUB_SERVER_URL']}/{os.environ['WORKFLOW_CONFIG_REF']}"}
+          expected_invocation = (
+              f"{os.environ['GITHUB_SERVER_URL']}/{os.environ['GITHUB_REPOSITORY']}"
+              f"/actions/runs/{os.environ['GITHUB_RUN_ID']}/attempts/{os.environ['GITHUB_RUN_ATTEMPT']}"
           )
           predicates = [row["verificationResult"]["statement"]["predicate"] for row in rows]
           def contains(dependencies, expected):
@@ -504,10 +566,12 @@ jobs:
           if not any(
               predicate.get("buildDefinition", {}).get("buildType") == expected_build_type
               and predicate.get("buildDefinition", {}).get("externalParameters")
-              == {
-                  "releaseTag": os.environ["RELEASE_TAG"],
-                  "workflowRef": os.environ["WORKFLOW_CONFIG_REF"],
-              }
+              == expected_external_parameters
+              and predicate.get("buildDefinition", {}).get("internalParameters")
+              == expected_internal_parameters
+              and predicate.get("runDetails", {}).get("builder") == expected_builder
+              and predicate.get("runDetails", {}).get("metadata")
+              == {"invocationId": expected_invocation}
               and contains(
                   predicate.get("buildDefinition", {}).get("resolvedDependencies", []),
                   expected_source,

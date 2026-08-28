@@ -25,6 +25,7 @@ PyPI Trusted Publishers are configured for both fixed projects, workflow file, a
 ## Remaining external gates
 
 - The original tag-triggered run failed safely before publication because checkout dereferenced the annotated tag locally. No PyPI file, MCP record, GitHub release, or release asset was created by that run.
-- Publication resumes only after the API-based recovery workflow is independently reviewed, merged through protected `main`, and its four deployment approvals are granted.
+- The first protected-main resume run also failed before publication because GitHub's attestation API rejected a repository-specific SLSA build-type URI. The corrected predicate retains the tag dependency but uses GitHub's supported workflow build type.
+- Publication resumes only after that narrow correction is independently reviewed, merged through protected `main`, and its four deployment approvals are granted.
 
 This document is a dated control receipt, not a claim that external publication has occurred.
