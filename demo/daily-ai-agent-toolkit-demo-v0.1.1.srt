@@ -109,7 +109,7 @@ and UNVERIFIED states.
 
 23
 00:02:20,000 --> 00:02:26,000
-The catalog runs with 19 Python tests
+The catalog runs with 33 Python tests
 and six deterministic skill self-tests.
 
 24

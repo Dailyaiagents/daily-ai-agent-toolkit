@@ -14,7 +14,7 @@ python -m pip install --require-hashes -r requirements/release.lock
 python -m pip install --no-deps -e servers/evidence-gate -e servers/release-gate
 bash scripts/test-all.sh
 pip-audit --strict --require-hashes --no-deps -r requirements/runtime.lock
-python scripts/verify-release.py --tag v0.1.0
+python scripts/verify-release.py --tag v0.1.1
 bash scripts/release-build.sh dist/release
 bash scripts/release-sbom.sh dist/release
 mcp-publisher validate servers/evidence-gate/server.json
@@ -41,9 +41,9 @@ deployment branches restricted to release tags:
 - `pypi-release-gate`: the same configuration for project
   `dailyaiagents-release-gate`.
 - `mcp-registry-evidence-gate`: protects GitHub OIDC publication of only
-  `io.github.dailyaiagents/evidence-gate`.
+  `io.github.Dailyaiagents/evidence-gate`.
 - `mcp-registry-release-gate`: protects GitHub OIDC publication of only
-  `io.github.dailyaiagents/release-gate`. No long-lived registry token is stored.
+  `io.github.Dailyaiagents/release-gate`. No long-lived registry token is stored.
 
 The GitHub organization must own the namespace, and PyPI projects must exist or
 have pending Trusted Publishers configured before the first tag. Organization

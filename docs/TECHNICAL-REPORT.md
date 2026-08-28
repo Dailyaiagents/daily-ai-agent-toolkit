@@ -1,6 +1,6 @@
 # Daily AI Agent Toolkit: Technical Report
 
-Version: `0.1.0` release candidate
+Version: `0.1.1` patch release candidate
 
 Project lead: Cooper Reed, founder and lead engineer, Daily AI Agents
 
@@ -64,9 +64,9 @@ A local `PASS` is not evidence of hosted availability, production reliability, e
 
 ## Verification status
 
-The retained local record in [`LOCAL-VERIFICATION.md`](https://github.com/Dailyaiagents/daily-ai-agent-toolkit/blob/v0.1.0/LOCAL-VERIFICATION.md) reports the following checks from 2026-08-27:
+The retained [`LOCAL-VERIFICATION.md`](https://github.com/Dailyaiagents/daily-ai-agent-toolkit/blob/v0.1.1/LOCAL-VERIFICATION.md) record distinguishes the 2026-08-27 baseline checks from the local `0.1.1` patch rerun on 2026-08-28:
 
-- 19 Python tests passed, including symlink, archive-link, malformed-contract, empty-evidence, self-asserted-status, request-budget, resource-limit, and demo-evidence cases;
+- 33 Python tests passed, including symlink, archive-link, malformed-contract, empty-evidence, self-asserted-status, request-budget, resource-limit, and demo-evidence cases;
 - all six skill self-tests passed;
 - all 20 declared-outcome examples matched across all eight tools;
 - both MCP manifests passed local `mcp-publisher validate` checks;
@@ -93,7 +93,7 @@ bash scripts/test-all.sh
 
 The SBOMs inventory the hash-locked `mcp==1.29.1` runtime graph plus each package as the root component. They are dependency snapshots, not vulnerability-free guarantees; the separate `pip-audit` gate checks the same complete runtime lock and must report zero known vulnerabilities at build time.
 
-After publication, clean-environment installation, PyPI attestations, exact public digest/size equality, GitHub provenance, and public registry discovery must be rerun against immutable version `0.1.0`; a successful local build does not substitute for those checks. Release artifacts retain wheels, source distributions, checksums, package-specific software bills of materials, demo evidence, registry manifests, and provenance together so a reviewer can relate public bytes to the reported verification.
+After publication, clean-environment installation, PyPI attestations, exact public digest/size equality, GitHub provenance, and public registry discovery must be rerun against immutable version `0.1.1`; a successful local build does not substitute for those checks. Release artifacts retain wheels, source distributions, checksums, package-specific software bills of materials, demo evidence, registry manifests, and provenance together so a reviewer can relate public bytes to the reported verification.
 
 ## Limitations
 

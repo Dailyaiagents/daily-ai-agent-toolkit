@@ -4,7 +4,7 @@ Local, deterministic tools for checking AI-generated work before it is released.
 
 The toolkit contains two Model Context Protocol (MCP) servers and six portable Agent Skills. They inspect retained artifacts, declared claim support, literal citations, completion contracts, blockers, and release receipts without calling a model, uploading files, or requiring a Daily AI Agents account.
 
-> **Release status:** `0.1.0` release candidate. Public PyPI and MCP Registry publication is pending the final release gate.
+> **Release status:** `0.1.1` patch release candidate. PyPI `0.1.0` is public; the patch corrects the case-sensitive MCP Registry ownership marker.
 
 ## Why this exists
 
@@ -48,8 +48,8 @@ They deliberately do **not** determine broad truth, judge semantic entailment, a
 Python 3.11 or newer is required.
 
 ```bash
-python -m pip install dailyaiagents-evidence-gate==0.1.0
-python -m pip install dailyaiagents-release-gate==0.1.0
+python -m pip install dailyaiagents-evidence-gate==0.1.1
+python -m pip install dailyaiagents-release-gate==0.1.1
 
 dailyai-evidence-gate --root /absolute/path/to/workspace
 dailyai-release-gate --root /absolute/path/to/workspace

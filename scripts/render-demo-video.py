@@ -17,8 +17,8 @@ from PIL import Image, ImageDraw, ImageFont
 
 
 ROOT = Path(__file__).resolve().parents[1]
-OUTPUT = ROOT / "demo" / "daily-ai-agent-toolkit-demo-v0.1.0.mp4"
-CAPTIONS = ROOT / "demo" / "daily-ai-agent-toolkit-demo-v0.1.0.srt"
+OUTPUT = ROOT / "demo" / "daily-ai-agent-toolkit-demo-v0.1.1.mp4"
+CAPTIONS = ROOT / "demo" / "daily-ai-agent-toolkit-demo-v0.1.1.srt"
 WIDTH, HEIGHT = 1920, 1080
 BG = "#08111f"
 PANEL = "#101d31"
@@ -56,7 +56,7 @@ SCENES = [
     {
         "duration": 18,
         "title": "Proof should travel with the work",
-        "status": "DAILY AI AGENT TOOLKIT  ·  v0.1.0",
+        "status": "DAILY AI AGENT TOOLKIT  ·  v0.1.1",
         "body": [
             "Two local MCP servers  ·  Eight deterministic tools",
             "Six portable Agent Skills  ·  No model or network calls",
@@ -160,13 +160,13 @@ SCENES = [
             "",
             "All 8 MCP tools exercised",
             "PASS  ·  FAIL  ·  BLOCKED  ·  UNVERIFIED",
-            "19 / 19 Python tests passed",
+            "33 / 33 Python tests passed",
             "6 / 6 Agent Skill self-tests passed",
         ],
         "accent": BLUE,
         "narration": (
             "A single demonstration can be hand picked, so the repository includes twenty declared-outcome examples across all eight tools. "
-            "They cover pass, fail, blocked, and unverified states. The same catalog runs in the test suite, alongside nineteen Python tests and six deterministic skill self-tests."
+            "They cover pass, fail, blocked, and unverified states. The same catalog runs in the test suite, alongside thirty-three Python tests and six deterministic skill self-tests."
         ),
     },
     {
@@ -178,8 +178,8 @@ SCENES = [
             "",
             "dailyaiagents-evidence-gate  ·  PyPI",
             "dailyaiagents-release-gate   ·  PyPI",
-            "io.github.dailyaiagents/evidence-gate  ·  MCP Registry",
-            "io.github.dailyaiagents/release-gate   ·  MCP Registry",
+            "io.github.Dailyaiagents/evidence-gate  ·  MCP Registry",
+            "io.github.Dailyaiagents/release-gate   ·  MCP Registry",
             "",
             "A local PASS is not semantic truth or release authority.",
         ],

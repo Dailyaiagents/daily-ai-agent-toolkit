@@ -1,6 +1,6 @@
 # Evidence Gate
 
-<!-- mcp-name: io.github.dailyaiagents/evidence-gate -->
+<!-- mcp-name: io.github.Dailyaiagents/evidence-gate -->
 
 A local MCP server that checks retained artifacts, declared claim support, and literal citation containment. It does not determine truth on its own and does not fetch URLs.
 
@@ -21,7 +21,7 @@ See the repository documentation for client configuration and limitations.
 
 ```bash
 python3.11 -m venv .venv
-.venv/bin/pip install dailyaiagents-evidence-gate==0.1.0
+.venv/bin/pip install dailyaiagents-evidence-gate==0.1.1
 .venv/bin/dailyai-evidence-gate --root "$PWD"
 ```
 

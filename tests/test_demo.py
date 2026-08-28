@@ -21,7 +21,7 @@ def test_video_renderer_uses_executable_demo_receipts() -> None:
     )
     assert str(module.SECOND["artifact"]["bytes"]) in flattened
     assert module.SECOND["artifact"]["sha256"][:8] in flattened
-    assert "19 / 19 Python tests passed" in flattened
+    assert "33 / 33 Python tests passed" in flattened
     assert "20 / 20 MATCHED" in str([scene["status"] for scene in module.SCENES])
     assert "Six portable Agent Skills" in flattened
     assert sum(scene["duration"] for scene in module.SCENES) < 180

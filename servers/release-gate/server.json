@@ -1,18 +1,18 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
-  "name": "io.github.dailyaiagents/release-gate",
+  "name": "io.github.Dailyaiagents/release-gate",
   "description": "Local completion-contract checks and release receipts.",
   "repository": {
     "id": "1349161176",
     "url": "https://github.com/Dailyaiagents/daily-ai-agent-toolkit",
     "source": "github"
   },
-  "version": "0.1.0",
+  "version": "0.1.1",
   "packages": [
     {
       "registryType": "pypi",
       "identifier": "dailyaiagents-release-gate",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "transport": { "type": "stdio" },
       "runtimeArguments": [
         { "type": "named", "name": "--root", "description": "Workspace root the server may read", "isRequired": true }

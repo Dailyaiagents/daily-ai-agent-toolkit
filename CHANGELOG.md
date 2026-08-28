@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.1 — 2026-08-28
+
+- Correct the case-sensitive MCP Registry namespace and PyPI ownership markers to the GitHub-authorized `io.github.Dailyaiagents/*` namespace.
+- Preserve the immutable public `0.1.0` packages as historical artifacts; no API, CLI, schema, or tool-name change.
+
 ## 0.1.0 — 2026-08-27
 
 - Added Evidence Gate and Release Gate MCP servers.
