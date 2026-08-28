@@ -23,10 +23,11 @@ repository-owner ID, and `github-hosted` runner environment.
 
 The predicate contains two required Git dependencies:
 
-1. `release-source`: `refs/tags/<releaseTag>` with the exact Git commit digest
+1. `release-workflow`: the protected ref and exact commit digest from which
+   `.github/workflows/release-evidence.yml` was loaded. It is first because
+   GitHub validates it as the canonical Actions source dependency.
+2. `release-source`: `refs/tags/<releaseTag>` with the exact Git commit digest
    resolved from the GitHub-verified annotated tag object.
-2. `release-workflow`: the protected ref and exact commit digest from which
-   `.github/workflows/release-evidence.yml` was loaded.
 
 ## Procedure
 

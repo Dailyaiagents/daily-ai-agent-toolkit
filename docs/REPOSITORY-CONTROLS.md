@@ -27,6 +27,7 @@ PyPI Trusted Publishers are configured for both fixed projects, workflow file, a
 - The original tag-triggered run failed safely before publication because checkout dereferenced the annotated tag locally. No PyPI file, MCP record, GitHub release, or release asset was created by that run.
 - The first protected-main resume run also failed before publication because GitHub's attestation API rejected a repository-specific SLSA build-type URI. The corrected predicate retains the tag dependency but uses GitHub's supported workflow build type.
 - A following resolver run failed before build when accumulated workflow-run JSON exceeded the operating system's environment size limit. The resolver now transfers API payloads through bounded runner-temporary files instead of environment variables.
+- The next run completed the reproducible build but GitHub rejected the custom predicate because its immutable-tag dependency preceded the canonical Actions source dependency. Both predicate builders now put the exact workflow ref and digest first while retaining the independently verified tag ref and digest as a required second dependency.
 - Publication resumes only after that narrow correction is independently reviewed, merged through protected `main`, and its four deployment approvals are granted.
 
 This document is a dated control receipt, not a claim that external publication has occurred.
