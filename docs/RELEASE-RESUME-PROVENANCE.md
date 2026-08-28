@@ -1,15 +1,23 @@
-# Immutable-tag release resume build type
+# Immutable-tag release resume provenance profile
 
 This document defines the custom SLSA provenance used when the release workflow
 must resume an existing immutable tag. The workflow is reviewed and executed
 from protected `main`, while package bytes are rebuilt only from the separately
 validated signed tag target.
 
+The predicate uses GitHub's supported
+`https://actions.github.io/buildtypes/workflow/v1` build type and its standard
+workflow external parameters. The release tag is added as a second resolved Git
+dependency rather than represented as a different or unsupported build type.
+
 ## External parameters
 
-- `releaseTag`: the semantic-version tag selected for publication.
-- `workflowRef`: GitHub's complete workflow configuration reference, including
-  the branch or tag from which the workflow definition was loaded.
+- `workflow.ref`: the Git ref from which the recovery workflow runs.
+- `workflow.repository`: the canonical GitHub repository URL.
+- `workflow.path`: `.github/workflows/release-evidence.yml`.
+
+The standard GitHub internal parameters retain the event name, repository ID,
+repository-owner ID, and `github-hosted` runner environment.
 
 ## Resolved dependencies
 
