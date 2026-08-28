@@ -1,0 +1,136 @@
+1
+00:00:00,000 --> 00:00:06,000
+AI systems can say work is complete
+before the evidence is retained.
+
+2
+00:00:06,000 --> 00:00:12,000
+I built the Daily AI Agent Toolkit
+to make that boundary explicit.
+
+3
+00:00:12,000 --> 00:00:18,000
+It provides two local MCP servers, eight tools,
+and six portable Agent Skills.
+
+4
+00:00:18,000 --> 00:00:25,000
+Evidence Gate checks a file beneath
+an operator-supplied root.
+
+5
+00:00:25,000 --> 00:00:32,000
+This synthetic report exists, but it is empty
+and fails the required-text rule.
+
+6
+00:00:32,000 --> 00:00:39,000
+The result is FAIL,
+with machine-readable findings.
+
+7
+00:00:39,000 --> 00:00:46,000
+This is a bounded local receipt,
+not a semantic judgment.
+
+8
+00:00:46,000 --> 00:00:52,000
+Release Gate converts the failed finding
+into an explicit blocker.
+
+9
+00:00:52,000 --> 00:00:58,000
+The requirement, state, reason,
+and repair remain visible.
+
+10
+00:00:58,000 --> 00:01:04,000
+Invalid evidence does not become
+an optimistic pass.
+
+11
+00:01:04,000 --> 00:01:10,000
+The next action remains inspectable.
+
+12
+00:01:10,000 --> 00:01:17,000
+I add the qualifying evidence
+and rerun the identical check.
+
+13
+00:01:17,000 --> 00:01:24,000
+It now passes and records a byte count
+and SHA-256 digest.
+
+14
+00:01:24,000 --> 00:01:31,000
+That proves this file met
+this declared rule.
+
+15
+00:01:31,000 --> 00:01:38,000
+It does not prove every statement
+in the report.
+
+16
+00:01:38,000 --> 00:01:44,000
+Release Gate hashes the repaired artifact
+into a retained release receipt.
+
+17
+00:01:44,000 --> 00:01:50,000
+The check status, path, byte count,
+digest, and limitation travel together.
+
+18
+00:01:50,000 --> 00:01:56,000
+The receipt does not publish,
+deploy, or approve anything.
+
+19
+00:01:56,000 --> 00:02:02,000
+It gives a reviewer reproducible evidence
+for the next controlled decision.
+
+20
+00:02:02,000 --> 00:02:08,000
+A single demonstration
+can be hand-picked.
+
+21
+00:02:08,000 --> 00:02:14,000
+The repository includes 20 declared outcomes
+across all eight tools.
+
+22
+00:02:14,000 --> 00:02:20,000
+They cover PASS, FAIL, BLOCKED,
+and UNVERIFIED states.
+
+23
+00:02:20,000 --> 00:02:26,000
+The catalog runs with 19 Python tests
+and six deterministic skill self-tests.
+
+24
+00:02:26,000 --> 00:02:33,000
+The Daily AI Agent Toolkit
+is open source, local, and deterministic.
+
+25
+00:02:33,000 --> 00:02:40,000
+It makes evidence, blockers, uncertainty,
+and artifact identity easier to inspect.
+
+26
+00:02:40,000 --> 00:02:47,000
+That inspection happens before release.
+
+27
+00:02:47,000 --> 00:02:54,000
+A local pass is never semantic truth
+or production proof.
+
+28
+00:02:54,000 --> 00:02:59,000
+And it is never publication authority.

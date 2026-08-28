@@ -1,0 +1,19 @@
+{
+  "schema_version": "dailyai.agent-skill-verification/v1",
+  "name": "contract-checker",
+  "version": "0.1.0",
+  "license": "Apache-2.0",
+  "verified_at": "2026-08-27",
+  "source": "https://github.com/Dailyaiagents/daily-ai-agent-toolkit",
+  "supported_clients": [
+    "clients supporting the portable Agent Skills directory format"
+  ],
+  "limitations": [
+    "Client installation paths and optional fields vary; inspect current client documentation."
+  ],
+  "files": {
+    "SKILL.md": "27e971092b1b79e4bd6be62bfcbc8e3b1b37af2c332705556571b660dcd126a5",
+    "scripts/run.sh": "c3ce2f97d3a7c51c856e68e40194b4d1276db8159c4b1ef139f464c3050cbd11",
+    "scripts/selftest.sh": "0f9eca215f6966d3dc3ff66f5519874ed879c5ada406420f8903632471758487"
+  }
+}

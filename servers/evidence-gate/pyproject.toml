@@ -1,0 +1,24 @@
+[build-system]
+requires = ["hatchling==1.27.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "dailyaiagents-evidence-gate"
+version = "0.1.0"
+description = "Local MCP tools for checking artifacts, claims, and citations"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "Apache-2.0"
+authors = [{ name = "Daily AI Agents LLC", email = "support@usedailyai.com" }]
+dependencies = ["mcp>=1.29.1,<1.30"]
+classifiers = ["License :: OSI Approved :: Apache Software License", "Programming Language :: Python :: 3"]
+
+[project.scripts]
+dailyai-evidence-gate = "dailyai_evidence_gate.server:main"
+
+[project.urls]
+Homepage = "https://usedailyai.com/marketplace/"
+Repository = "https://github.com/Dailyaiagents/daily-ai-agent-toolkit"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/dailyai_evidence_gate"]

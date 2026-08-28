@@ -1,0 +1,174 @@
+{
+  "schema_version": "dailyai.toolkit-examples/v1",
+  "cases": [
+    {
+      "id": "evidence.artifact.present",
+      "title": "A non-empty artifact containing a required term passes",
+      "tool": "verify_artifact",
+      "fixtures": {"report.md": "Release candidate: READY\n"},
+      "input": {"artifact_path": "report.md", "required_terms": ["READY"]},
+      "expected": {"status": "PASS", "checked": 1, "finding_codes": []}
+    },
+    {
+      "id": "evidence.artifact.term-missing",
+      "title": "An artifact missing a required term fails",
+      "tool": "verify_artifact",
+      "fixtures": {"report.md": "Release candidate: PENDING\n"},
+      "input": {"artifact_path": "report.md", "required_terms": ["READY"]},
+      "expected": {"status": "FAIL", "checked": 1, "finding_codes": ["required_term_missing"]}
+    },
+    {
+      "id": "evidence.artifact.file-missing",
+      "title": "A missing artifact fails without leaving the declared root",
+      "tool": "verify_artifact",
+      "fixtures": {},
+      "input": {"artifact_path": "missing.md"},
+      "expected": {"status": "FAIL", "checked": 1}
+    },
+    {
+      "id": "evidence.claim.local-source",
+      "title": "A claim with available local evidence passes the presence check",
+      "tool": "audit_claims",
+      "fixtures": {"source.txt": "The retained sample contains thirteen entries.\n"},
+      "input": {"claims": [{"statement": "A retained sample exists", "source_paths": ["source.txt"]}]},
+      "expected": {"status": "PASS", "checked": 1, "finding_codes": ["declared_local_evidence_present"]}
+    },
+    {
+      "id": "evidence.claim.url-only",
+      "title": "A URL-only claim remains unverified because the server is offline",
+      "tool": "audit_claims",
+      "fixtures": {},
+      "input": {"claims": [{"statement": "The external page is current", "source_urls": ["https://example.com/evidence"]}]},
+      "expected": {"status": "UNVERIFIED", "checked": 1, "finding_codes": ["url_not_fetched"]}
+    },
+    {
+      "id": "evidence.claim.no-source",
+      "title": "A claim without declared evidence fails",
+      "tool": "audit_claims",
+      "fixtures": {},
+      "input": {"claims": [{"statement": "An unsupported assertion"}]},
+      "expected": {"status": "FAIL", "checked": 1, "finding_codes": ["evidence_missing"]}
+    },
+    {
+      "id": "evidence.citation.contained",
+      "title": "A literally contained quotation passes",
+      "tool": "audit_citations",
+      "fixtures": {"source.txt": "The retained sample contains thirteen entries.\n"},
+      "input": {"pairs": [{"quote": "sample contains thirteen entries", "source_path": "source.txt"}]},
+      "expected": {"status": "PASS", "checked": 1, "finding_codes": ["quote_contained"]}
+    },
+    {
+      "id": "evidence.citation.not-contained",
+      "title": "A quotation absent from its source fails",
+      "tool": "audit_citations",
+      "fixtures": {"source.txt": "The retained sample contains thirteen entries.\n"},
+      "input": {"pairs": [{"quote": "twenty entries", "source_path": "source.txt"}]},
+      "expected": {"status": "FAIL", "checked": 1, "finding_codes": ["quote_not_contained"]}
+    },
+    {
+      "id": "evidence.summary.all-pass",
+      "title": "A summary of passing receipts passes",
+      "tool": "summarize_verification",
+      "fixtures": {"proof.txt": "proof"},
+      "input": {"results": [{"schema_version": "dailyai.evidence-gate-receipt/v1", "tool": "verify_artifact", "status": "PASS", "generated_at": "2026-08-27T00:00:00+00:00", "checked": 1, "findings": [], "limitations": [], "artifact": {"path": "proof.txt", "sha256": "c1cda26362828b69266512052b97cb3729e3b052e4ade47c0a1e3383defe73c7"}}, {"schema_version": "dailyai.release-gate-receipt/v1", "tool": "build_release_receipt", "status": "PASS", "generated_at": "2026-08-27T00:00:00+00:00", "findings": [], "limitations": [], "artifacts": [{"path": "proof.txt", "sha256": "c1cda26362828b69266512052b97cb3729e3b052e4ade47c0a1e3383defe73c7"}]}]},
+      "expected": {"status": "PASS", "checked": 2}
+    },
+    {
+      "id": "evidence.summary.not-run",
+      "title": "A not-run check keeps the summary unverified",
+      "tool": "summarize_verification",
+      "fixtures": {"proof.txt": "proof"},
+      "input": {"results": [{"schema_version": "dailyai.evidence-gate-receipt/v1", "tool": "verify_artifact", "status": "PASS", "generated_at": "2026-08-27T00:00:00+00:00", "checked": 1, "findings": [], "limitations": [], "artifact": {"path": "proof.txt", "sha256": "c1cda26362828b69266512052b97cb3729e3b052e4ade47c0a1e3383defe73c7"}}, {"schema_version": "dailyai.release-gate-receipt/v1", "tool": "evaluate_completion", "status": "NOT_RUN", "generated_at": "2026-08-27T00:00:00+00:00", "findings": [], "limitations": [], "requirements": [{"id": "r1", "status": "NOT_RUN"}]}]},
+      "expected": {"status": "UNVERIFIED", "checked": 2}
+    },
+    {
+      "id": "evidence.summary.blocked",
+      "title": "A blocked check keeps the summary blocked",
+      "tool": "summarize_verification",
+      "fixtures": {"proof.txt": "proof"},
+      "input": {"results": [{"schema_version": "dailyai.evidence-gate-receipt/v1", "tool": "verify_artifact", "status": "PASS", "generated_at": "2026-08-27T00:00:00+00:00", "checked": 1, "findings": [], "limitations": [], "artifact": {"path": "proof.txt", "sha256": "c1cda26362828b69266512052b97cb3729e3b052e4ade47c0a1e3383defe73c7"}}, {"schema_version": "dailyai.release-gate-receipt/v1", "tool": "format_blockers", "status": "BLOCKED", "generated_at": "2026-08-27T00:00:00+00:00", "findings": [{"requirement_id": "r1", "state": "BLOCKED"}], "limitations": []}]},
+      "expected": {"status": "BLOCKED", "checked": 2}
+    },
+    {
+      "id": "release.contract.complete",
+      "title": "A contract whose declared evidence exists passes",
+      "tool": "check_contract",
+      "fixtures": {
+        "contract.json": "{\"requirements\":[{\"id\":\"r1\",\"evidence_paths\":[\"proof.txt\"]}]}",
+        "proof.txt": "retained proof\n"
+      },
+      "input": {"contract_path": "contract.json"},
+      "expected": {"status": "PASS", "finding_statuses": ["PASS"]}
+    },
+    {
+      "id": "release.contract.file-missing",
+      "title": "A contract with missing declared evidence fails",
+      "tool": "check_contract",
+      "fixtures": {"contract.json": "{\"requirements\":[{\"id\":\"r1\",\"evidence_paths\":[\"missing.txt\"]}]}"},
+      "input": {"contract_path": "contract.json"},
+      "expected": {"status": "FAIL", "finding_statuses": ["FAIL"]}
+    },
+    {
+      "id": "release.contract.paths-unspecified",
+      "title": "A requirement without evidence paths remains unverified",
+      "tool": "check_contract",
+      "fixtures": {"contract.json": "{\"requirements\":[{\"id\":\"r1\"}]}"},
+      "input": {"contract_path": "contract.json"},
+      "expected": {"status": "UNVERIFIED", "finding_codes": ["evidence_paths_missing"]}
+    },
+    {
+      "id": "release.completion.proven",
+      "title": "Passing evidence with retained references completes a requirement",
+      "tool": "evaluate_completion",
+      "fixtures": {"proof.txt": "proof"},
+      "input": {
+        "requirements": [{"id": "r1"}],
+        "evidence": [{"requirement_id": "r1", "status": "PASS", "evidence_refs": ["proof.txt"], "receipt": {"schema_version": "dailyai.evidence-gate-receipt/v1", "tool": "verify_artifact", "status": "PASS", "generated_at": "2026-08-27T00:00:00+00:00", "checked": 1, "findings": [], "limitations": [], "artifact": {"path": "proof.txt", "sha256": "c1cda26362828b69266512052b97cb3729e3b052e4ade47c0a1e3383defe73c7"}}}]
+      },
+      "expected": {"status": "PASS", "finding_statuses": ["PASS"]}
+    },
+    {
+      "id": "release.completion.authority-blocked",
+      "title": "A blocked authority requirement keeps completion blocked",
+      "tool": "evaluate_completion",
+      "fixtures": {},
+      "input": {
+        "requirements": [{"id": "publish-authority"}],
+        "evidence": [{"requirement_id": "publish-authority", "status": "BLOCKED", "evidence_refs": ["authority-record.json"], "receipt": {"schema_version": "dailyai.release-gate-receipt/v1", "tool": "format_blockers", "status": "BLOCKED", "generated_at": "2026-08-27T00:00:00+00:00", "findings": [{"requirement_id": "publish-authority", "state": "BLOCKED"}], "limitations": []}}]
+      },
+      "expected": {"status": "BLOCKED", "finding_statuses": ["BLOCKED"]}
+    },
+    {
+      "id": "release.blockers.none",
+      "title": "Passing findings produce no blockers",
+      "tool": "format_blockers",
+      "fixtures": {},
+      "input": {"findings": [{"id": "r1", "status": "PASS"}]},
+      "expected": {"status": "PASS", "finding_count": 0}
+    },
+    {
+      "id": "release.blockers.explicit",
+      "title": "A not-run finding becomes an explicit blocker",
+      "tool": "format_blockers",
+      "fixtures": {},
+      "input": {"findings": [{"id": "r1", "status": "NOT_RUN", "code": "evidence_absent"}]},
+      "expected": {"status": "BLOCKED", "finding_count": 1}
+    },
+    {
+      "id": "release.receipt.complete",
+      "title": "Passing checks and a retained artifact produce a passing receipt",
+      "tool": "build_release_receipt",
+      "fixtures": {"artifact.txt": "release artifact\n"},
+      "input": {"checks": [{"schema_version": "dailyai.evidence-gate-receipt/v1", "tool": "verify_artifact", "status": "PASS", "generated_at": "2026-08-27T00:00:00+00:00", "checked": 1, "findings": [], "limitations": [], "artifact": {"path": "artifact.txt", "sha256": "2459cfc17228ee4883b0a5516980c0c12d2220f4da0e08a608f31bdeae59f92c"}}], "artifacts": ["artifact.txt"]},
+      "expected": {"status": "PASS", "finding_statuses": ["PASS", "PASS"]}
+    },
+    {
+      "id": "release.receipt.uncertain-check",
+      "title": "An unverified check prevents a passing release receipt",
+      "tool": "build_release_receipt",
+      "fixtures": {"artifact.txt": "release artifact\n"},
+      "input": {"checks": [{"schema_version": "dailyai.evidence-gate-receipt/v1", "tool": "audit_claims", "status": "UNVERIFIED", "generated_at": "2026-08-27T00:00:00+00:00", "checked": 1, "findings": [{"code": "url_not_fetched"}], "limitations": []}], "artifacts": ["artifact.txt"]},
+      "expected": {"status": "UNVERIFIED", "finding_statuses": ["UNVERIFIED", "PASS"]}
+    }
+  ]
+}

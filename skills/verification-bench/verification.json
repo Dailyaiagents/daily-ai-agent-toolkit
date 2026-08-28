@@ -1,0 +1,19 @@
+{
+  "schema_version": "dailyai.agent-skill-verification/v1",
+  "name": "verification-bench",
+  "version": "0.1.0",
+  "license": "Apache-2.0",
+  "verified_at": "2026-08-27",
+  "source": "https://github.com/Dailyaiagents/daily-ai-agent-toolkit",
+  "supported_clients": [
+    "clients supporting the portable Agent Skills directory format"
+  ],
+  "limitations": [
+    "Client installation paths and optional fields vary; inspect current client documentation."
+  ],
+  "files": {
+    "SKILL.md": "9010d9db7aa61338705fa46f147b8f41e570e403cd23745d80d6f4886499241d",
+    "scripts/run.sh": "b6f38fb96bba26098f3e0b68a61969b472e914aaa2def351d96def9f77ce71bf",
+    "scripts/selftest.sh": "0b22041ac790d60b59ec64b1f6061772d8d5e2bab69bd366438a6c1a15e8512e"
+  }
+}
