@@ -61,8 +61,8 @@ PY
 done
 
 mkdir -p "${output_root}/demo" "${output_root}/docs" "${output_root}/registry"
-cp "${repo_root}/demo/daily-ai-agent-toolkit-demo-v0.1.0.mp4" "${output_root}/demo/"
-cp "${repo_root}/demo/daily-ai-agent-toolkit-demo-v0.1.0.srt" "${output_root}/demo/"
+cp "${repo_root}/demo/daily-ai-agent-toolkit-demo-v0.1.1.mp4" "${output_root}/demo/"
+cp "${repo_root}/demo/daily-ai-agent-toolkit-demo-v0.1.1.srt" "${output_root}/demo/"
 cp "${repo_root}/docs/DEMO-TRANSCRIPT.md" "${output_root}/docs/"
 cp "${repo_root}/docs/TECHNICAL-REPORT.md" "${output_root}/docs/"
 cp "${repo_root}/servers/evidence-gate/server.json" "${output_root}/registry/evidence-gate.server.json"

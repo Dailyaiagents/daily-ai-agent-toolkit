@@ -601,12 +601,47 @@ jobs:
           path: ${{ steps.attest.outputs.bundle-path }}
           if-no-files-found: error
 
+  preflight-evidence-gate:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      publish: ${{ steps.preflight.outputs.publish }}
+    env:
+      RELEASE_VERSION: ${{ needs.build.outputs.release_version }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: ${{ needs.build.outputs.target_sha }}
+          fetch-depth: 1
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: toolkit-release-${{ needs.build.outputs.target_sha }}
+          path: dist/release
+      - run: python -m pip install --require-hashes -r requirements/release.lock
+      - id: preflight
+        name: Fail closed or skip an exact existing PyPI release
+        run: |
+          python scripts/pypi-publish-preflight.py \
+            --slug evidence-gate \
+            --version "${RELEASE_VERSION}" \
+            --manifest dist/release/RELEASE-MANIFEST.json \
+            --repository "https://github.com/${GITHUB_REPOSITORY}"
+
   publish-evidence-gate:
-    needs: [build, provenance-evidence-gate, provenance-release-gate]
+    needs:
+      [build, provenance-evidence-gate, provenance-release-gate, preflight-evidence-gate]
+    if: needs.preflight-evidence-gate.outputs.publish == 'true'
     runs-on: ubuntu-latest
     environment: pypi-evidence-gate
     permissions:
       id-token: write
+      contents: read
     steps:
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
@@ -619,12 +654,47 @@ jobs:
           print-hash: true
           skip-existing: false
 
+  preflight-release-gate:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      publish: ${{ steps.preflight.outputs.publish }}
+    env:
+      RELEASE_VERSION: ${{ needs.build.outputs.release_version }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: ${{ needs.build.outputs.target_sha }}
+          fetch-depth: 1
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: toolkit-release-${{ needs.build.outputs.target_sha }}
+          path: dist/release
+      - run: python -m pip install --require-hashes -r requirements/release.lock
+      - id: preflight
+        name: Fail closed or skip an exact existing PyPI release
+        run: |
+          python scripts/pypi-publish-preflight.py \
+            --slug release-gate \
+            --version "${RELEASE_VERSION}" \
+            --manifest dist/release/RELEASE-MANIFEST.json \
+            --repository "https://github.com/${GITHUB_REPOSITORY}"
+
   publish-release-gate:
-    needs: [build, provenance-evidence-gate, provenance-release-gate]
+    needs:
+      [build, provenance-evidence-gate, provenance-release-gate, preflight-release-gate]
+    if: needs.preflight-release-gate.outputs.publish == 'true'
     runs-on: ubuntu-latest
     environment: pypi-release-gate
     permissions:
       id-token: write
+      contents: read
     steps:
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
@@ -638,7 +708,19 @@ jobs:
           skip-existing: false
 
   verify-pypi:
-    needs: [build, publish-evidence-gate, publish-release-gate]
+    needs:
+      [build, provenance-evidence-gate, provenance-release-gate, preflight-evidence-gate, preflight-release-gate, publish-evidence-gate, publish-release-gate]
+    if: >-
+      always() &&
+      needs.build.result == 'success' &&
+      needs.provenance-evidence-gate.result == 'success' &&
+      needs.provenance-release-gate.result == 'success' &&
+      needs.preflight-evidence-gate.result == 'success' &&
+      needs.preflight-release-gate.result == 'success' &&
+      ((needs.preflight-evidence-gate.outputs.publish == 'true' && needs.publish-evidence-gate.result == 'success') ||
+       (needs.preflight-evidence-gate.outputs.publish == 'false' && needs.publish-evidence-gate.result == 'skipped')) &&
+      ((needs.preflight-release-gate.outputs.publish == 'true' && needs.publish-release-gate.result == 'success') ||
+       (needs.preflight-release-gate.outputs.publish == 'false' && needs.publish-release-gate.result == 'skipped'))
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -732,12 +814,12 @@ jobs:
             --retry 18 --retry-all-errors --retry-delay 10 --max-time 45 \
             --max-filesize 1048576 \
             --output dist/registry-public/evidence-gate.json \
-            "https://registry.modelcontextprotocol.io/v0.1/servers/io.github.dailyaiagents%2Fevidence-gate/versions/${RELEASE_VERSION}"
+            "https://registry.modelcontextprotocol.io/v0.1/servers/io.github.Dailyaiagents%2Fevidence-gate/versions/${RELEASE_VERSION}"
           curl --fail --location --silent --show-error \
             --retry 18 --retry-all-errors --retry-delay 10 --max-time 45 \
             --max-filesize 1048576 \
             --output dist/registry-public/release-gate.json \
-            "https://registry.modelcontextprotocol.io/v0.1/servers/io.github.dailyaiagents%2Frelease-gate/versions/${RELEASE_VERSION}"
+            "https://registry.modelcontextprotocol.io/v0.1/servers/io.github.Dailyaiagents%2Frelease-gate/versions/${RELEASE_VERSION}"
       - name: Match public records to the fixed release manifests
         run: |
           python - <<'PY'
@@ -954,14 +1036,14 @@ jobs:
           expected = {
               "SHA256SUMS",
               "RELEASE-MANIFEST.json",
-              "dailyaiagents_evidence_gate-0.1.0-py3-none-any.whl",
-              "dailyaiagents_evidence_gate-0.1.0.tar.gz",
+              "dailyaiagents_evidence_gate-0.1.1-py3-none-any.whl",
+              "dailyaiagents_evidence_gate-0.1.1.tar.gz",
               "evidence-gate.sbom.cdx.json",
-              "dailyaiagents_release_gate-0.1.0-py3-none-any.whl",
-              "dailyaiagents_release_gate-0.1.0.tar.gz",
+              "dailyaiagents_release_gate-0.1.1-py3-none-any.whl",
+              "dailyaiagents_release_gate-0.1.1.tar.gz",
               "release-gate.sbom.cdx.json",
-              "daily-ai-agent-toolkit-demo-v0.1.0.mp4",
-              "daily-ai-agent-toolkit-demo-v0.1.0.srt",
+              "daily-ai-agent-toolkit-demo-v0.1.1.mp4",
+              "daily-ai-agent-toolkit-demo-v0.1.1.srt",
               "DEMO-TRANSCRIPT.md",
               "TECHNICAL-REPORT.md",
               "evidence-gate.server.json",

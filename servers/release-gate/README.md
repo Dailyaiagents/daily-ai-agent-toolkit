@@ -1,6 +1,6 @@
 # Release Gate
 
-<!-- mcp-name: io.github.dailyaiagents/release-gate -->
+<!-- mcp-name: io.github.Dailyaiagents/release-gate -->
 
 A local MCP server that compares retained evidence with explicit completion requirements and produces release receipts. It does not run arbitrary shell commands or publish anything.
 
@@ -19,7 +19,7 @@ dailyai-release-gate --root /path/to/workspace
 
 ```bash
 python3.11 -m venv .venv
-.venv/bin/pip install dailyaiagents-release-gate==0.1.0
+.venv/bin/pip install dailyaiagents-release-gate==0.1.1
 .venv/bin/dailyai-release-gate --root "$PWD"
 ```
 

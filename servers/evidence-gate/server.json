@@ -1,18 +1,18 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
-  "name": "io.github.dailyaiagents/evidence-gate",
+  "name": "io.github.Dailyaiagents/evidence-gate",
   "description": "Local checks for artifacts, declared claim evidence, and citation containment.",
   "repository": {
     "id": "1349161176",
     "url": "https://github.com/Dailyaiagents/daily-ai-agent-toolkit",
     "source": "github"
   },
-  "version": "0.1.0",
+  "version": "0.1.1",
   "packages": [
     {
       "registryType": "pypi",
       "identifier": "dailyaiagents-evidence-gate",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "transport": { "type": "stdio" },
       "runtimeArguments": [
         { "type": "named", "name": "--root", "description": "Workspace root the server may read", "isRequired": true }

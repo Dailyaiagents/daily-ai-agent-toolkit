@@ -6,7 +6,7 @@ These drafts are intentionally anonymized. Replace bracketed fields only with pu
 
 Status: `PENDING_PUBLICATION`
 
-Release gate: use the language below only after the public repository, both PyPI `0.1.0` packages, both MCP Registry entries, and retained verification artifacts work without authentication.
+Release gate: use the language below only after the public repository, both corrected PyPI `0.1.1` packages, both MCP Registry entries, and retained verification artifacts work without authentication.
 
 ### Resume draft
 

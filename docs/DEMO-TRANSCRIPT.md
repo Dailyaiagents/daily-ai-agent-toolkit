@@ -2,7 +2,7 @@
 
 Runtime: 2:59
 
-Artifact: `daily-ai-agent-toolkit-demo-v0.1.0.mp4`
+Artifact: `daily-ai-agent-toolkit-demo-v0.1.1.mp4`
 
 ## 0:00 — Proof should travel with the work
 
@@ -26,7 +26,7 @@ Release Gate then hashes the repaired artifact into a retained release receipt. 
 
 ## 2:08 — Fixed examples prevent hand-picked proof
 
-A single demonstration can be hand picked, so the repository includes twenty declared-outcome examples across all eight tools. They cover pass, fail, blocked, and unverified states. The same catalog runs in the test suite, alongside nineteen Python tests and six deterministic skill self-tests.
+A single demonstration can be hand picked, so the repository includes twenty declared-outcome examples across all eight tools. They cover pass, fail, blocked, and unverified states. The same catalog runs in the test suite, alongside thirty-three Python tests and six deterministic skill self-tests.
 
 ## 2:34 — Inspect the evidence. Keep the boundary.
 

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "dailyaiagents-release-gate"
-version = "0.1.0"
+version = "0.1.1"
 description = "Local MCP tools for completion contracts and release receipts"
 readme = "README.md"
 requires-python = ">=3.11"

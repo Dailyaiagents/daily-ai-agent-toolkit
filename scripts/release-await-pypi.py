@@ -12,8 +12,8 @@ from pathlib import Path
 
 
 PACKAGES = {
-    "dailyaiagents-evidence-gate": "io.github.dailyaiagents/evidence-gate",
-    "dailyaiagents-release-gate": "io.github.dailyaiagents/release-gate",
+    "dailyaiagents-evidence-gate": "io.github.Dailyaiagents/evidence-gate",
+    "dailyaiagents-release-gate": "io.github.Dailyaiagents/release-gate",
 }
 PACKAGES_BY_SLUG = {
     "evidence-gate": "dailyaiagents-evidence-gate",

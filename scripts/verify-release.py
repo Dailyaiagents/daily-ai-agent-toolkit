@@ -20,21 +20,21 @@ PACKAGES = {
         "distribution": "dailyaiagents-evidence-gate",
         "module": "dailyai_evidence_gate",
         "command": "dailyai-evidence-gate",
-        "mcp_name": "io.github.dailyaiagents/evidence-gate",
+        "mcp_name": "io.github.Dailyaiagents/evidence-gate",
         "repository_id": "1349161176",
     },
     "release-gate": {
         "distribution": "dailyaiagents-release-gate",
         "module": "dailyai_release_gate",
         "command": "dailyai-release-gate",
-        "mcp_name": "io.github.dailyaiagents/release-gate",
+        "mcp_name": "io.github.Dailyaiagents/release-gate",
         "repository_id": "1349161176",
     },
 }
 
 REQUIRED_RELEASE_ASSETS = (
-    "demo/daily-ai-agent-toolkit-demo-v0.1.0.mp4",
-    "demo/daily-ai-agent-toolkit-demo-v0.1.0.srt",
+    "demo/daily-ai-agent-toolkit-demo-v0.1.1.mp4",
+    "demo/daily-ai-agent-toolkit-demo-v0.1.1.srt",
     "docs/DEMO-TRANSCRIPT.md",
     "docs/TECHNICAL-REPORT.md",
     "registry/evidence-gate.server.json",
