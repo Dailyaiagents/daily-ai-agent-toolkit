@@ -1,0 +1,19 @@
+{
+  "schema_version": "dailyai.agent-skill-verification/v1",
+  "name": "artifact-verifier",
+  "version": "0.1.0",
+  "license": "Apache-2.0",
+  "verified_at": "2026-08-27",
+  "source": "https://github.com/Dailyaiagents/daily-ai-agent-toolkit",
+  "supported_clients": [
+    "clients supporting the portable Agent Skills directory format"
+  ],
+  "limitations": [
+    "Client installation paths and optional fields vary; inspect current client documentation."
+  ],
+  "files": {
+    "SKILL.md": "ef66f5b1d24e1115b05f6e15cccceb4702e04f499a23d2de422f7f6042747209",
+    "scripts/run.sh": "44c7256ea6830d6471067ce0b0e087734e92e5089e5b23c560d35091264e31a7",
+    "scripts/selftest.sh": "ea5833944e99ba2484a286024936d6be9afe2612e855b33b756a294365d9b599"
+  }
+}

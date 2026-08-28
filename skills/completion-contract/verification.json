@@ -1,0 +1,19 @@
+{
+  "schema_version": "dailyai.agent-skill-verification/v1",
+  "name": "completion-contract",
+  "version": "0.1.0",
+  "license": "Apache-2.0",
+  "verified_at": "2026-08-27",
+  "source": "https://github.com/Dailyaiagents/daily-ai-agent-toolkit",
+  "supported_clients": [
+    "clients supporting the portable Agent Skills directory format"
+  ],
+  "limitations": [
+    "Client installation paths and optional fields vary; inspect current client documentation."
+  ],
+  "files": {
+    "SKILL.md": "252a30b54b5b27633bbb01a23aabcc682759f6797167de6f9bc3779980c968e9",
+    "scripts/run.sh": "bcf0265307100ef1e6eb7821bdf0e561caca3cc81b24c8be7e2cd4f306165fe0",
+    "scripts/selftest.sh": "bb7d86d964a1a4a1d390e4cb95ace73101f2609fd4737d25184e9bf89e83dd10"
+  }
+}

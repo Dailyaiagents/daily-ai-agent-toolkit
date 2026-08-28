@@ -1,0 +1,19 @@
+{
+  "schema_version": "dailyai.agent-skill-verification/v1",
+  "name": "claim-truth-gate",
+  "version": "0.1.0",
+  "license": "Apache-2.0",
+  "verified_at": "2026-08-27",
+  "source": "https://github.com/Dailyaiagents/daily-ai-agent-toolkit",
+  "supported_clients": [
+    "clients supporting the portable Agent Skills directory format"
+  ],
+  "limitations": [
+    "Client installation paths and optional fields vary; inspect current client documentation."
+  ],
+  "files": {
+    "SKILL.md": "ad513200998d7ea384e2356474fa91867f24f808015edfa904830615a8af6fc0",
+    "scripts/run.sh": "c7cda9d65b3986be5ea833b0bbd4c2d2ad5184a41e2776774e9a11346366f0de",
+    "scripts/selftest.sh": "6b53c61287189557dab2ea229c5948ddd75d77cbeab7afc1420d445add8dc375"
+  }
+}

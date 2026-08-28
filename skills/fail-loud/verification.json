@@ -1,0 +1,19 @@
+{
+  "schema_version": "dailyai.agent-skill-verification/v1",
+  "name": "fail-loud",
+  "version": "0.1.0",
+  "license": "Apache-2.0",
+  "verified_at": "2026-08-27",
+  "source": "https://github.com/Dailyaiagents/daily-ai-agent-toolkit",
+  "supported_clients": [
+    "clients supporting the portable Agent Skills directory format"
+  ],
+  "limitations": [
+    "Client installation paths and optional fields vary; inspect current client documentation."
+  ],
+  "files": {
+    "SKILL.md": "931ee12ffac446032a1a09a76390c765dcb315e7b2ada32d37ff86231458a3fa",
+    "scripts/run.sh": "6057b377f91808472e77dcfa3610e79fead2f6497973b73f0bb72249d221115b",
+    "scripts/selftest.sh": "10b69daa4af37cc726c4fdb9647a9b324625816e5cc068e9237155214d59c47e"
+  }
+}
