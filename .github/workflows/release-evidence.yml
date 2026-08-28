@@ -2,11 +2,16 @@ name: release-toolkit
 
 on:
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing immutable signed release tag
+        required: true
+        type: string
   push:
     tags: ['v*']
 
 concurrency:
-  group: release-${{ github.ref }}
+  group: release-${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref_name }}
   cancel-in-progress: false
 
 permissions:
@@ -16,41 +21,161 @@ env:
   PYTHON_VERSION: '3.11'
   MCP_PUBLISHER_VERSION: '1.8.1'
   MCP_PUBLISHER_LINUX_AMD64_SHA256: a06c9096dcb9727c13555b6be26c7effa707b01f06a4c561ba7a3635443cf2cc
+  RELEASE_SIGNER_PUBLIC_KEY: ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIK0ju/G5VrPNT0cqQjbSSz4TSKezgXISf9MKVmV7mc6U
+  RELEASE_SIGNER_PRINCIPAL: 261465842+dailyaiagents-cpu@users.noreply.github.com
 
 jobs:
-  build:
+  resolve-release:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      actions: read
+    outputs:
+      release_tag: ${{ steps.resolve.outputs.release_tag }}
+      release_version: ${{ steps.resolve.outputs.release_version }}
+      tag_object_sha: ${{ steps.resolve.outputs.tag_object_sha }}
+      target_sha: ${{ steps.resolve.outputs.target_sha }}
+    steps:
+      - id: resolve
+        name: Resolve and verify the immutable release tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DISPATCH_TAG: ${{ inputs.release_tag }}
+        run: |
+          set -euo pipefail
+
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            release_tag="${DISPATCH_TAG}"
+          else
+            [[ "${GITHUB_REF_TYPE}" == "tag" ]]
+            release_tag="${GITHUB_REF_NAME}"
+          fi
+          [[ "${release_tag}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+
+          ref_json="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${release_tag}")"
+          [[ "$(jq -r .ref <<<"${ref_json}")" == "refs/tags/${release_tag}" ]]
+          [[ "$(jq -r .object.type <<<"${ref_json}")" == "tag" ]]
+          tag_object_sha="$(jq -r .object.sha <<<"${ref_json}")"
+          [[ "${tag_object_sha}" =~ ^[0-9a-f]{40}$ ]]
+
+          tag_json="$(gh api "repos/${GITHUB_REPOSITORY}/git/tags/${tag_object_sha}")"
+          [[ "$(jq -r .sha <<<"${tag_json}")" == "${tag_object_sha}" ]]
+          [[ "$(jq -r .tag <<<"${tag_json}")" == "${release_tag}" ]]
+          [[ "$(jq -r .object.type <<<"${tag_json}")" == "commit" ]]
+          [[ "$(jq -r .verification.verified <<<"${tag_json}")" == "true" ]]
+          [[ "$(jq -r .verification.reason <<<"${tag_json}")" == "valid" ]]
+          target_sha="$(jq -r .object.sha <<<"${tag_json}")"
+          [[ "${target_sha}" =~ ^[0-9a-f]{40}$ ]]
+
+          compare_json="$(gh api "repos/${GITHUB_REPOSITORY}/compare/${target_sha}...main")"
+          compare_status="$(jq -r .status <<<"${compare_json}")"
+          [[ "${compare_status}" == "ahead" || "${compare_status}" == "identical" ]]
+          [[ "$(jq -r .merge_base_commit.sha <<<"${compare_json}")" == "${target_sha}" ]]
+
+          workflow_json="$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml")"
+          [[ "$(jq -r .path <<<"${workflow_json}")" == ".github/workflows/ci.yml" ]]
+          [[ "$(jq -r .state <<<"${workflow_json}")" == "active" ]]
+          workflow_id="$(jq -r .id <<<"${workflow_json}")"
+          [[ "${workflow_id}" =~ ^[0-9]+$ ]]
+
+          runs_json="$(gh api \
+            "repos/${GITHUB_REPOSITORY}/actions/workflows/${workflow_id}/runs?event=push&status=success&per_page=100")"
+          run_id="$(WORKFLOW_RUNS="${runs_json}" TARGET_SHA="${target_sha}" python - <<'PY'
+          import json
+          import os
+
+          rows = json.loads(os.environ["WORKFLOW_RUNS"]).get("workflow_runs", [])
+          matches = [
+              row
+              for row in rows
+              if row.get("head_sha") == os.environ["TARGET_SHA"]
+              and row.get("head_branch") == "main"
+              and row.get("event") == "push"
+              and row.get("status") == "completed"
+              and row.get("conclusion") == "success"
+              and row.get("path") == ".github/workflows/ci.yml"
+          ]
+          if not matches:
+              raise SystemExit("no successful main push run from the required CI workflow")
+          print(max(matches, key=lambda row: row["id"])["id"])
+          PY
+          )"
+          [[ "${run_id}" =~ ^[0-9]+$ ]]
+
+          jobs_json="$(gh api \
+            "repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}/jobs?per_page=100")"
+          WORKFLOW_JOBS="${jobs_json}" TARGET_SHA="${target_sha}" python - <<'PY'
+          import json
+          import os
+
+          required = {
+              "test (ubuntu-latest, 3.11)",
+              "test (ubuntu-latest, 3.12)",
+              "test (ubuntu-latest, 3.13)",
+              "test (macos-latest, 3.11)",
+              "test (macos-latest, 3.12)",
+              "test (macos-latest, 3.13)",
+              "dependency-audit",
+              "workflow-security",
+          }
+          rows = json.loads(os.environ["WORKFLOW_JOBS"]).get("jobs", [])
+          actual = {row.get("name") for row in rows}
+          if actual != required:
+              raise SystemExit(
+                  f"required CI job set mismatch: missing={sorted(required - actual)}, "
+                  f"unexpected={sorted(actual - required)}"
+              )
+          invalid = [
+              row.get("name")
+              for row in rows
+              if row.get("head_sha") != os.environ["TARGET_SHA"]
+              or row.get("status") != "completed"
+              or row.get("conclusion") != "success"
+          ]
+          if invalid:
+              raise SystemExit(f"required CI jobs not successful at target SHA: {invalid}")
+          PY
+
+          {
+            printf 'release_tag=%s\n' "${release_tag}"
+            printf 'release_version=%s\n' "${release_tag#v}"
+            printf 'tag_object_sha=%s\n' "${tag_object_sha}"
+            printf 'target_sha=%s\n' "${target_sha}"
+          } >> "${GITHUB_OUTPUT}"
+
+  build:
+    needs: resolve-release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      release_tag: ${{ needs.resolve-release.outputs.release_tag }}
+      release_version: ${{ needs.resolve-release.outputs.release_version }}
+      tag_object_sha: ${{ needs.resolve-release.outputs.tag_object_sha }}
+      target_sha: ${{ needs.resolve-release.outputs.target_sha }}
+    env:
+      RELEASE_TAG: ${{ needs.resolve-release.outputs.release_tag }}
+      RELEASE_VERSION: ${{ needs.resolve-release.outputs.release_version }}
+      RELEASE_TAG_OBJECT_SHA: ${{ needs.resolve-release.outputs.tag_object_sha }}
+      RELEASE_TARGET_SHA: ${{ needs.resolve-release.outputs.target_sha }}
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
-          fetch-depth: 0
+          ref: ${{ needs.resolve-release.outputs.target_sha }}
+          fetch-depth: 1
           persist-credentials: false
-      - name: Verify annotated signed tag, main reachability, and prior CI
-        if: github.ref_type == 'tag'
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - name: Bind checkout to the validated immutable tag
         run: |
-          [[ "$(git cat-file -t "${GITHUB_REF_NAME}")" == "tag" ]]
-          git fetch origin main
-          git merge-base --is-ancestor "${GITHUB_SHA}" origin/main
-          tag_object="$(git rev-parse "${GITHUB_REF_NAME}^{tag}")"
-          [[ "$(gh api "repos/${GITHUB_REPOSITORY}/git/tags/${tag_object}" --jq .verification.verified)" == "true" ]]
-          check_runs="$(gh api "repos/${GITHUB_REPOSITORY}/commits/${GITHUB_SHA}/check-runs")"
-          CHECK_RUNS="$check_runs" python - <<'PY'
-          import json, os
-          payload = json.loads(os.environ["CHECK_RUNS"])
-          successful = {
-              row["name"] for row in payload.get("check_runs", [])
-              if row.get("status") == "completed" and row.get("conclusion") == "success"
-          }
-          required_prefixes = ("test (", "dependency-audit")
-          if sum(name.startswith("test (") for name in successful) < 6:
-              raise SystemExit("six successful test-matrix checks are required before tagging")
-          if not any(name == "dependency-audit" for name in successful):
-              raise SystemExit("successful dependency-audit check is required before tagging")
-          PY
+          set -euo pipefail
+          [[ "$(git rev-parse HEAD)" == "${RELEASE_TARGET_SHA}" ]]
+          git fetch --no-tags origin \
+            "+refs/tags/${RELEASE_TAG}:refs/tags/${RELEASE_TAG}"
+          [[ "$(git cat-file -t "refs/tags/${RELEASE_TAG}")" == "tag" ]]
+          [[ "$(git rev-parse "refs/tags/${RELEASE_TAG}^{tag}")" == "${RELEASE_TAG_OBJECT_SHA}" ]]
+          [[ "$(git rev-parse "refs/tags/${RELEASE_TAG}^{commit}")" == "${RELEASE_TARGET_SHA}" ]]
+          allowed_signers="${RUNNER_TEMP}/release-allowed-signers"
+          printf '%s %s\n' "${RELEASE_SIGNER_PRINCIPAL}" "${RELEASE_SIGNER_PUBLIC_KEY}" > "${allowed_signers}"
+          git -c gpg.ssh.allowedSignersFile="${allowed_signers}" verify-tag "${RELEASE_TAG}"
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -63,9 +188,7 @@ jobs:
         run: |
           bash scripts/test-all.sh
           pip-audit --strict --require-hashes --no-deps -r requirements/runtime.lock
-          args=()
-          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then args+=(--tag "${GITHUB_REF_NAME}"); fi
-          python scripts/verify-release.py "${args[@]}"
+          python scripts/verify-release.py --tag "${RELEASE_TAG}"
       - name: Build twice, compare bytes, and create package SBOMs
         run: |
           bash scripts/release-build.sh dist/release
@@ -73,7 +196,7 @@ jobs:
       - name: Validate clean locked installs expose four tools per server
         run: |
           python scripts/verify-public-release.py \
-            --version "${GITHUB_REF_NAME#v}" \
+            --version "${RELEASE_VERSION}" \
             --manifest dist/release/RELEASE-MANIFEST.json \
             --artifacts dist/release
       - name: Fetch and validate the pinned MCP publisher and manifests
@@ -93,13 +216,13 @@ jobs:
           cp dist/release/release-gate/*.whl dist/release/release-gate/*.tar.gz dist/pypi/release-gate/
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: toolkit-release-${{ github.sha }}
+          name: toolkit-release-${{ needs.resolve-release.outputs.target_sha }}
           path: dist/release/
           if-no-files-found: error
           retention-days: 30
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: mcp-publisher-${{ github.sha }}
+          name: mcp-publisher-${{ needs.resolve-release.outputs.target_sha }}
           path: |
             dist/mcp-publisher/mcp-publisher
             dist/mcp-publisher/mcp-publisher.tar.gz
@@ -107,70 +230,305 @@ jobs:
           retention-days: 30
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: pypi-evidence-gate-${{ github.sha }}
+          name: pypi-evidence-gate-${{ needs.resolve-release.outputs.target_sha }}
           path: dist/pypi/evidence-gate/
           if-no-files-found: error
           retention-days: 30
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: pypi-release-gate-${{ github.sha }}
+          name: pypi-release-gate-${{ needs.resolve-release.outputs.target_sha }}
           path: dist/pypi/release-gate/
           if-no-files-found: error
           retention-days: 30
 
   provenance-evidence-gate:
-    if: github.event_name == 'push' && github.ref_type == 'tag'
     needs: build
     runs-on: ubuntu-latest
     permissions:
       id-token: write
       attestations: write
       contents: read
+    env:
+      RELEASE_TAG: ${{ needs.build.outputs.release_tag }}
+      RELEASE_TARGET_SHA: ${{ needs.build.outputs.target_sha }}
+      WORKFLOW_CONFIG_REF: ${{ github.workflow_ref }}
+      WORKFLOW_CONFIG_SHA: ${{ github.workflow_sha }}
     steps:
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
-          name: toolkit-release-${{ github.sha }}
+          name: toolkit-release-${{ needs.build.outputs.target_sha }}
           path: dist/release
+      - name: Describe the tagged source and reviewed workflow inputs
+        run: |
+          set -euo pipefail
+          workflow_git_ref="${WORKFLOW_CONFIG_REF##*@}"
+          [[ "${workflow_git_ref}" == refs/heads/* || "${workflow_git_ref}" == refs/tags/* ]]
+          jq -n \
+            --arg build_type "https://github.com/${GITHUB_REPOSITORY}/blob/${WORKFLOW_CONFIG_SHA}/docs/RELEASE-RESUME-PROVENANCE.md" \
+            --arg repository "${GITHUB_REPOSITORY}" \
+            --arg release_tag "${RELEASE_TAG}" \
+            --arg target_sha "${RELEASE_TARGET_SHA}" \
+            --arg workflow_ref "${WORKFLOW_CONFIG_REF}" \
+            --arg workflow_git_ref "${workflow_git_ref}" \
+            --arg workflow_sha "${WORKFLOW_CONFIG_SHA}" \
+            --arg invocation "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${GITHUB_RUN_ATTEMPT}" \
+            '{
+              buildDefinition: {
+                buildType: $build_type,
+                externalParameters: {
+                  releaseTag: $release_tag,
+                  workflowRef: $workflow_ref
+                },
+                internalParameters: {},
+                resolvedDependencies: [
+                  {
+                    uri: ("git+https://github.com/" + $repository + "@refs/tags/" + $release_tag),
+                    digest: {gitCommit: $target_sha},
+                    annotations: {"dailyaiagents_role": "release-source"}
+                  },
+                  {
+                    uri: ("git+https://github.com/" + $repository + "@" + $workflow_git_ref),
+                    digest: {gitCommit: $workflow_sha},
+                    annotations: {"dailyaiagents_role": "release-workflow"}
+                  }
+                ]
+              },
+              runDetails: {
+                builder: {
+                  id: ("https://github.com/" + $repository + "/.github/workflows/release-evidence.yml@" + $workflow_git_ref)
+                },
+                metadata: {invocationId: $invocation}
+              }
+            }' > provenance-predicate.json
       - id: attest
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-path: |
             dist/release/evidence-gate/*.whl
             dist/release/evidence-gate/*.tar.gz
+          predicate-type: https://slsa.dev/provenance/v1
+          predicate-path: provenance-predicate.json
+      - name: Cryptographically verify the signed predicate and build context
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BUNDLE_PATH: ${{ steps.attest.outputs.bundle-path }}
+        run: |
+          set -euo pipefail
+          for artifact in dist/release/evidence-gate/*.whl dist/release/evidence-gate/*.tar.gz; do
+            verification="$(gh attestation verify "${artifact}" \
+              --bundle "${BUNDLE_PATH}" \
+              --repo "${GITHUB_REPOSITORY}" \
+              --signer-workflow "${GITHUB_REPOSITORY}/.github/workflows/release-evidence.yml" \
+              --signer-digest "${WORKFLOW_CONFIG_SHA}" \
+              --source-ref "${GITHUB_REF}" \
+              --source-digest "${GITHUB_SHA}" \
+              --deny-self-hosted-runners \
+              --predicate-type https://slsa.dev/provenance/v1 \
+              --format json)"
+            ATTESTATION="${verification}" python - <<'PY'
+          import json
+          import os
+
+          rows = json.loads(os.environ["ATTESTATION"])
+          expected_source = {
+              "uri": (
+                  "git+https://github.com/"
+                  f"{os.environ['GITHUB_REPOSITORY']}@refs/tags/{os.environ['RELEASE_TAG']}"
+              ),
+              "digest": {"gitCommit": os.environ["RELEASE_TARGET_SHA"]},
+          }
+          expected_workflow_ref = os.environ["WORKFLOW_CONFIG_REF"].rsplit("@", 1)[1]
+          expected_workflow = {
+              "uri": (
+                  "git+https://github.com/"
+                  f"{os.environ['GITHUB_REPOSITORY']}@{expected_workflow_ref}"
+              ),
+              "digest": {"gitCommit": os.environ["WORKFLOW_CONFIG_SHA"]},
+          }
+          expected_build_type = (
+              "https://github.com/"
+              f"{os.environ['GITHUB_REPOSITORY']}/blob/{os.environ['WORKFLOW_CONFIG_SHA']}"
+              "/docs/RELEASE-RESUME-PROVENANCE.md"
+          )
+          predicates = [row["verificationResult"]["statement"]["predicate"] for row in rows]
+          def contains(dependencies, expected):
+              return any(
+                  item.get("uri") == expected["uri"]
+                  and item.get("digest") == expected["digest"]
+                  for item in dependencies
+              )
+
+          if not any(
+              predicate.get("buildDefinition", {}).get("buildType") == expected_build_type
+              and predicate.get("buildDefinition", {}).get("externalParameters")
+              == {
+                  "releaseTag": os.environ["RELEASE_TAG"],
+                  "workflowRef": os.environ["WORKFLOW_CONFIG_REF"],
+              }
+              and contains(
+                  predicate.get("buildDefinition", {}).get("resolvedDependencies", []),
+                  expected_source,
+              )
+              and contains(
+                  predicate.get("buildDefinition", {}).get("resolvedDependencies", []),
+                  expected_workflow,
+              )
+              for predicate in predicates
+          ):
+              raise SystemExit("signed provenance does not bind release source and workflow inputs")
+          PY
+          done
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: evidence-gate-provenance-${{ github.sha }}
+          name: evidence-gate-provenance-${{ needs.build.outputs.target_sha }}
           path: ${{ steps.attest.outputs.bundle-path }}
           if-no-files-found: error
 
   provenance-release-gate:
-    if: github.event_name == 'push' && github.ref_type == 'tag'
     needs: build
     runs-on: ubuntu-latest
     permissions:
       id-token: write
       attestations: write
       contents: read
+    env:
+      RELEASE_TAG: ${{ needs.build.outputs.release_tag }}
+      RELEASE_TARGET_SHA: ${{ needs.build.outputs.target_sha }}
+      WORKFLOW_CONFIG_REF: ${{ github.workflow_ref }}
+      WORKFLOW_CONFIG_SHA: ${{ github.workflow_sha }}
     steps:
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
-          name: toolkit-release-${{ github.sha }}
+          name: toolkit-release-${{ needs.build.outputs.target_sha }}
           path: dist/release
+      - name: Describe the tagged source and reviewed workflow inputs
+        run: |
+          set -euo pipefail
+          workflow_git_ref="${WORKFLOW_CONFIG_REF##*@}"
+          [[ "${workflow_git_ref}" == refs/heads/* || "${workflow_git_ref}" == refs/tags/* ]]
+          jq -n \
+            --arg build_type "https://github.com/${GITHUB_REPOSITORY}/blob/${WORKFLOW_CONFIG_SHA}/docs/RELEASE-RESUME-PROVENANCE.md" \
+            --arg repository "${GITHUB_REPOSITORY}" \
+            --arg release_tag "${RELEASE_TAG}" \
+            --arg target_sha "${RELEASE_TARGET_SHA}" \
+            --arg workflow_ref "${WORKFLOW_CONFIG_REF}" \
+            --arg workflow_git_ref "${workflow_git_ref}" \
+            --arg workflow_sha "${WORKFLOW_CONFIG_SHA}" \
+            --arg invocation "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${GITHUB_RUN_ATTEMPT}" \
+            '{
+              buildDefinition: {
+                buildType: $build_type,
+                externalParameters: {
+                  releaseTag: $release_tag,
+                  workflowRef: $workflow_ref
+                },
+                internalParameters: {},
+                resolvedDependencies: [
+                  {
+                    uri: ("git+https://github.com/" + $repository + "@refs/tags/" + $release_tag),
+                    digest: {gitCommit: $target_sha},
+                    annotations: {"dailyaiagents_role": "release-source"}
+                  },
+                  {
+                    uri: ("git+https://github.com/" + $repository + "@" + $workflow_git_ref),
+                    digest: {gitCommit: $workflow_sha},
+                    annotations: {"dailyaiagents_role": "release-workflow"}
+                  }
+                ]
+              },
+              runDetails: {
+                builder: {
+                  id: ("https://github.com/" + $repository + "/.github/workflows/release-evidence.yml@" + $workflow_git_ref)
+                },
+                metadata: {invocationId: $invocation}
+              }
+            }' > provenance-predicate.json
       - id: attest
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-path: |
             dist/release/release-gate/*.whl
             dist/release/release-gate/*.tar.gz
+          predicate-type: https://slsa.dev/provenance/v1
+          predicate-path: provenance-predicate.json
+      - name: Cryptographically verify the signed predicate and build context
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BUNDLE_PATH: ${{ steps.attest.outputs.bundle-path }}
+        run: |
+          set -euo pipefail
+          for artifact in dist/release/release-gate/*.whl dist/release/release-gate/*.tar.gz; do
+            verification="$(gh attestation verify "${artifact}" \
+              --bundle "${BUNDLE_PATH}" \
+              --repo "${GITHUB_REPOSITORY}" \
+              --signer-workflow "${GITHUB_REPOSITORY}/.github/workflows/release-evidence.yml" \
+              --signer-digest "${WORKFLOW_CONFIG_SHA}" \
+              --source-ref "${GITHUB_REF}" \
+              --source-digest "${GITHUB_SHA}" \
+              --deny-self-hosted-runners \
+              --predicate-type https://slsa.dev/provenance/v1 \
+              --format json)"
+            ATTESTATION="${verification}" python - <<'PY'
+          import json
+          import os
+
+          rows = json.loads(os.environ["ATTESTATION"])
+          expected_source = {
+              "uri": (
+                  "git+https://github.com/"
+                  f"{os.environ['GITHUB_REPOSITORY']}@refs/tags/{os.environ['RELEASE_TAG']}"
+              ),
+              "digest": {"gitCommit": os.environ["RELEASE_TARGET_SHA"]},
+          }
+          expected_workflow_ref = os.environ["WORKFLOW_CONFIG_REF"].rsplit("@", 1)[1]
+          expected_workflow = {
+              "uri": (
+                  "git+https://github.com/"
+                  f"{os.environ['GITHUB_REPOSITORY']}@{expected_workflow_ref}"
+              ),
+              "digest": {"gitCommit": os.environ["WORKFLOW_CONFIG_SHA"]},
+          }
+          expected_build_type = (
+              "https://github.com/"
+              f"{os.environ['GITHUB_REPOSITORY']}/blob/{os.environ['WORKFLOW_CONFIG_SHA']}"
+              "/docs/RELEASE-RESUME-PROVENANCE.md"
+          )
+          predicates = [row["verificationResult"]["statement"]["predicate"] for row in rows]
+          def contains(dependencies, expected):
+              return any(
+                  item.get("uri") == expected["uri"]
+                  and item.get("digest") == expected["digest"]
+                  for item in dependencies
+              )
+
+          if not any(
+              predicate.get("buildDefinition", {}).get("buildType") == expected_build_type
+              and predicate.get("buildDefinition", {}).get("externalParameters")
+              == {
+                  "releaseTag": os.environ["RELEASE_TAG"],
+                  "workflowRef": os.environ["WORKFLOW_CONFIG_REF"],
+              }
+              and contains(
+                  predicate.get("buildDefinition", {}).get("resolvedDependencies", []),
+                  expected_source,
+              )
+              and contains(
+                  predicate.get("buildDefinition", {}).get("resolvedDependencies", []),
+                  expected_workflow,
+              )
+              for predicate in predicates
+          ):
+              raise SystemExit("signed provenance does not bind release source and workflow inputs")
+          PY
+          done
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: release-gate-provenance-${{ github.sha }}
+          name: release-gate-provenance-${{ needs.build.outputs.target_sha }}
           path: ${{ steps.attest.outputs.bundle-path }}
           if-no-files-found: error
 
   publish-evidence-gate:
-    if: github.event_name == 'push' && github.ref_type == 'tag'
-    needs: build
+    needs: [build, provenance-evidence-gate, provenance-release-gate]
     runs-on: ubuntu-latest
     environment: pypi-evidence-gate
     permissions:
@@ -178,7 +536,7 @@ jobs:
     steps:
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
-          name: pypi-evidence-gate-${{ github.sha }}
+          name: pypi-evidence-gate-${{ needs.build.outputs.target_sha }}
           path: dist/pypi/evidence-gate
       - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # release/v1
         with:
@@ -188,8 +546,7 @@ jobs:
           skip-existing: false
 
   publish-release-gate:
-    if: github.event_name == 'push' && github.ref_type == 'tag'
-    needs: build
+    needs: [build, provenance-evidence-gate, provenance-release-gate]
     runs-on: ubuntu-latest
     environment: pypi-release-gate
     permissions:
@@ -197,7 +554,7 @@ jobs:
     steps:
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
-          name: pypi-release-gate-${{ github.sha }}
+          name: pypi-release-gate-${{ needs.build.outputs.target_sha }}
           path: dist/pypi/release-gate
       - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # release/v1
         with:
@@ -207,35 +564,37 @@ jobs:
           skip-existing: false
 
   verify-pypi:
-    if: github.event_name == 'push' && github.ref_type == 'tag'
     needs: [build, publish-evidence-gate, publish-release-gate]
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    env:
+      RELEASE_VERSION: ${{ needs.build.outputs.release_version }}
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
+          ref: ${{ needs.build.outputs.target_sha }}
+          fetch-depth: 1
           persist-credentials: false
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
-          name: toolkit-release-${{ github.sha }}
+          name: toolkit-release-${{ needs.build.outputs.target_sha }}
           path: dist/release
       - run: python -m pip install --require-hashes -r requirements/release.lock
       - name: Match public PyPI files to the immutable manifest and attestations
         run: |
           python scripts/release-await-pypi.py \
-            --version "${GITHUB_REF_NAME#v}" \
+            --version "${RELEASE_VERSION}" \
             --manifest dist/release/RELEASE-MANIFEST.json \
             --timeout 300
           python scripts/verify-public-release.py \
-            --version "${GITHUB_REF_NAME#v}" \
+            --version "${RELEASE_VERSION}" \
             --manifest dist/release/RELEASE-MANIFEST.json
 
   publish-mcp-evidence-gate:
-    if: github.event_name == 'push' && github.ref_type == 'tag'
     needs: [build, verify-pypi]
     runs-on: ubuntu-latest
     environment: mcp-registry-evidence-gate
@@ -244,11 +603,11 @@ jobs:
     steps:
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
-          name: toolkit-release-${{ github.sha }}
+          name: toolkit-release-${{ needs.build.outputs.target_sha }}
           path: dist/release
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
-          name: mcp-publisher-${{ github.sha }}
+          name: mcp-publisher-${{ needs.build.outputs.target_sha }}
           path: dist/mcp-publisher
       - name: Publish only the fixed Evidence Gate manifest
         run: |
@@ -258,7 +617,6 @@ jobs:
           dist/mcp-publisher/mcp-publisher publish dist/release/registry/evidence-gate.server.json
 
   publish-mcp-release-gate:
-    if: github.event_name == 'push' && github.ref_type == 'tag'
     needs: [build, verify-pypi]
     runs-on: ubuntu-latest
     environment: mcp-registry-release-gate
@@ -267,11 +625,11 @@ jobs:
     steps:
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
-          name: toolkit-release-${{ github.sha }}
+          name: toolkit-release-${{ needs.build.outputs.target_sha }}
           path: dist/release
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
-          name: mcp-publisher-${{ github.sha }}
+          name: mcp-publisher-${{ needs.build.outputs.target_sha }}
           path: dist/mcp-publisher
       - name: Publish only the fixed Release Gate manifest
         run: |
@@ -280,29 +638,98 @@ jobs:
           dist/mcp-publisher/mcp-publisher login github-oidc
           dist/mcp-publisher/mcp-publisher publish dist/release/registry/release-gate.server.json
 
+  verify-mcp-registry:
+    needs: [build, publish-mcp-evidence-gate, publish-mcp-release-gate]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      RELEASE_VERSION: ${{ needs.build.outputs.release_version }}
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: toolkit-release-${{ needs.build.outputs.target_sha }}
+          path: dist/release
+      - name: Fetch both public registry records without authentication
+        run: |
+          set -euo pipefail
+          mkdir -p dist/registry-public
+          curl --fail --location --silent --show-error \
+            --retry 18 --retry-all-errors --retry-delay 10 --max-time 45 \
+            --max-filesize 1048576 \
+            --output dist/registry-public/evidence-gate.json \
+            "https://registry.modelcontextprotocol.io/v0.1/servers/io.github.dailyaiagents%2Fevidence-gate/versions/${RELEASE_VERSION}"
+          curl --fail --location --silent --show-error \
+            --retry 18 --retry-all-errors --retry-delay 10 --max-time 45 \
+            --max-filesize 1048576 \
+            --output dist/registry-public/release-gate.json \
+            "https://registry.modelcontextprotocol.io/v0.1/servers/io.github.dailyaiagents%2Frelease-gate/versions/${RELEASE_VERSION}"
+      - name: Match public records to the fixed release manifests
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          def require_subset(expected, actual, location="server"):
+              if isinstance(expected, dict):
+                  if not isinstance(actual, dict):
+                      raise SystemExit(f"{location}: expected object")
+                  for key, value in expected.items():
+                      if key not in actual:
+                          raise SystemExit(f"{location}: missing {key}")
+                      require_subset(value, actual[key], f"{location}.{key}")
+              elif isinstance(expected, list):
+                  if not isinstance(actual, list) or len(actual) != len(expected):
+                      raise SystemExit(f"{location}: list mismatch")
+                  for index, value in enumerate(expected):
+                      require_subset(value, actual[index], f"{location}[{index}]")
+              elif expected != actual:
+                  raise SystemExit(f"{location}: expected {expected!r}, got {actual!r}")
+
+          for package in ("evidence-gate", "release-gate"):
+              expected = json.loads(
+                  Path(f"dist/release/registry/{package}.server.json").read_text()
+              )
+              response = json.loads(
+                  Path(f"dist/registry-public/{package}.json").read_text()
+              )
+              actual = response.get("server")
+              if not isinstance(actual, dict):
+                  raise SystemExit(f"{package}: public response omits server")
+              require_subset(expected, actual)
+              official = response.get("_meta", {}).get(
+                  "io.modelcontextprotocol.registry/official", {}
+              )
+              if official.get("status") != "active":
+                  raise SystemExit(f"{package}: public record is not active")
+          print("public MCP registry verification PASS: 2/2 exact declared records active")
+          PY
+
   github-release:
-    if: github.event_name == 'push' && github.ref_type == 'tag'
     needs:
       - build
       - provenance-evidence-gate
       - provenance-release-gate
-      - publish-mcp-evidence-gate
-      - publish-mcp-release-gate
+      - verify-mcp-registry
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    env:
+      RELEASE_TAG: ${{ needs.build.outputs.release_tag }}
+      RELEASE_TARGET_SHA: ${{ needs.build.outputs.target_sha }}
+      WORKFLOW_CONFIG_SHA: ${{ github.workflow_sha }}
     steps:
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
-          name: toolkit-release-${{ github.sha }}
+          name: toolkit-release-${{ needs.build.outputs.target_sha }}
           path: dist/release
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
-          name: evidence-gate-provenance-${{ github.sha }}
+          name: evidence-gate-provenance-${{ needs.build.outputs.target_sha }}
           path: dist/provenance/evidence-gate
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
-          name: release-gate-provenance-${{ github.sha }}
+          name: release-gate-provenance-${{ needs.build.outputs.target_sha }}
           path: dist/provenance/release-gate
       - name: Create immutable release bundle and GitHub release
         env:
@@ -313,16 +740,30 @@ jobs:
           [[ "${#evidence_bundles[@]}" -eq 1 && "${#release_bundles[@]}" -eq 1 ]]
           cp "${evidence_bundles[0]}" dist/evidence-gate-provenance.sigstore.json
           cp "${release_bundles[0]}" dist/release-gate-provenance.sigstore.json
-          sha256sum dist/*-gate-provenance.sigstore.json > dist/PROVENANCE-SHA256SUMS
+          (cd dist && sha256sum ./*-gate-provenance.sigstore.json > PROVENANCE-SHA256SUMS)
           for artifact in dist/release/evidence-gate/*.whl dist/release/evidence-gate/*.tar.gz; do
-            gh attestation verify "$artifact" --bundle dist/evidence-gate-provenance.sigstore.json --repo "${GITHUB_REPOSITORY}"
+            gh attestation verify "$artifact" \
+              --bundle dist/evidence-gate-provenance.sigstore.json \
+              --repo "${GITHUB_REPOSITORY}" \
+              --signer-workflow "${GITHUB_REPOSITORY}/.github/workflows/release-evidence.yml" \
+              --signer-digest "${WORKFLOW_CONFIG_SHA}" \
+              --source-ref "${GITHUB_REF}" \
+              --source-digest "${GITHUB_SHA}" \
+              --deny-self-hosted-runners
           done
           for artifact in dist/release/release-gate/*.whl dist/release/release-gate/*.tar.gz; do
-            gh attestation verify "$artifact" --bundle dist/release-gate-provenance.sigstore.json --repo "${GITHUB_REPOSITORY}"
+            gh attestation verify "$artifact" \
+              --bundle dist/release-gate-provenance.sigstore.json \
+              --repo "${GITHUB_REPOSITORY}" \
+              --signer-workflow "${GITHUB_REPOSITORY}/.github/workflows/release-evidence.yml" \
+              --signer-digest "${WORKFLOW_CONFIG_SHA}" \
+              --source-ref "${GITHUB_REF}" \
+              --source-digest "${GITHUB_SHA}" \
+              --deny-self-hosted-runners
           done
           tar --sort=name --mtime="@${SOURCE_DATE_EPOCH:-0}" --owner=0 --group=0 --numeric-owner \
-            -czf "dist/daily-ai-agent-toolkit-${GITHUB_REF_NAME}-release-bundle.tar.gz" -C dist release
-          gh release create "${GITHUB_REF_NAME}" \
+            -czf "dist/daily-ai-agent-toolkit-${RELEASE_TAG}-release-bundle.tar.gz" -C dist release
+          gh release create "${RELEASE_TAG}" \
             dist/release/SHA256SUMS \
             dist/release/RELEASE-MANIFEST.json \
             dist/release/evidence-gate/* \
@@ -332,34 +773,195 @@ jobs:
             dist/release/registry/* \
             dist/*-gate-provenance.sigstore.json \
             dist/PROVENANCE-SHA256SUMS \
-            "dist/daily-ai-agent-toolkit-${GITHUB_REF_NAME}-release-bundle.tar.gz" \
+            "dist/daily-ai-agent-toolkit-${RELEASE_TAG}-release-bundle.tar.gz" \
             --repo "${GITHUB_REPOSITORY}" \
             --verify-tag \
             --generate-notes \
-            --title "Daily AI Agent Toolkit ${GITHUB_REF_NAME}"
+            --title "Daily AI Agent Toolkit ${RELEASE_TAG}" \
+            --draft
+          mkdir -p dist/draft-assets
+          gh release download "${RELEASE_TAG}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --pattern '*' \
+            --dir dist/draft-assets
+          python - <<'PY'
+          import hashlib
+          from pathlib import Path
+
+          source_patterns = (
+              "dist/release/SHA256SUMS",
+              "dist/release/RELEASE-MANIFEST.json",
+              "dist/release/evidence-gate/*",
+              "dist/release/release-gate/*",
+              "dist/release/demo/*",
+              "dist/release/docs/*",
+              "dist/release/registry/*",
+              "dist/*-gate-provenance.sigstore.json",
+              "dist/PROVENANCE-SHA256SUMS",
+              "dist/daily-ai-agent-toolkit-*-release-bundle.tar.gz",
+          )
+          sources = []
+          for pattern in source_patterns:
+              sources.extend(Path().glob(pattern))
+          expected = {path.name: path for path in sources if path.is_file()}
+          if len(expected) != len(sources):
+              raise SystemExit("draft source asset names are not unique")
+          downloaded = {
+              path.name: path for path in Path("dist/draft-assets").iterdir() if path.is_file()
+          }
+          if downloaded.keys() != expected.keys():
+              raise SystemExit("uploaded draft asset inventory mismatch")
+          for name, source in expected.items():
+              left = hashlib.sha256(source.read_bytes()).digest()
+              right = hashlib.sha256(downloaded[name].read_bytes()).digest()
+              if left != right:
+                  raise SystemExit(f"uploaded draft asset digest mismatch: {name}")
+          print(f"authenticated draft asset verification PASS: {len(expected)}")
+          PY
+          gh release edit "${RELEASE_TAG}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --draft=false
 
   verify-github-release:
-    if: github.event_name == 'push' && github.ref_type == 'tag'
-    needs: github-release
+    needs: [build, github-release]
     runs-on: ubuntu-latest
     permissions:
       contents: read
       attestations: read
+    env:
+      RELEASE_TAG: ${{ needs.build.outputs.release_tag }}
+      RELEASE_TARGET_SHA: ${{ needs.build.outputs.target_sha }}
+      WORKFLOW_CONFIG_SHA: ${{ github.workflow_sha }}
     steps:
-      - name: Verify public bundle checksums and GitHub provenance
+      - name: Verify immutable release attestation and anonymous asset inventory
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          mkdir -p dist/download
-          gh release download "${GITHUB_REF_NAME}" \
-            --repo "${GITHUB_REPOSITORY}" \
-            --pattern "daily-ai-agent-toolkit-${GITHUB_REF_NAME}-release-bundle.tar.gz" \
-            --dir dist/download
+          set -euo pipefail
+          verified=false
+          for _ in {1..12}; do
+            if gh release verify "${RELEASE_TAG}" --repo "${GITHUB_REPOSITORY}"; then
+              verified=true
+              break
+            fi
+            sleep 5
+          done
+          [[ "${verified}" == "true" ]]
+          mkdir -p dist/public-assets dist/download
+          curl --fail --location --silent --show-error \
+            --retry 6 --retry-all-errors --retry-delay 5 --max-time 45 \
+            --max-filesize 5242880 \
+            --output dist/release.json \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/releases/tags/${RELEASE_TAG}"
+          curl --fail --location --silent --show-error \
+            --retry 6 --retry-all-errors --retry-delay 5 --max-time 45 \
+            --max-filesize 1048576 \
+            --output dist/tag-ref.json \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/git/ref/tags/${RELEASE_TAG}"
+          tag_object_sha="$(jq -r .object.sha dist/tag-ref.json)"
+          [[ "$(jq -r .object.type dist/tag-ref.json)" == "tag" ]]
+          [[ "${tag_object_sha}" =~ ^[0-9a-f]{40}$ ]]
+          curl --fail --location --silent --show-error \
+            --retry 6 --retry-all-errors --retry-delay 5 --max-time 45 \
+            --max-filesize 1048576 \
+            --output dist/tag-object.json \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/git/tags/${tag_object_sha}"
+          [[ "$(jq -r .verification.verified dist/tag-object.json)" == "true" ]]
+          [[ "$(jq -r .verification.reason dist/tag-object.json)" == "valid" ]]
+          [[ "$(jq -r .object.sha dist/tag-object.json)" == "${RELEASE_TARGET_SHA}" ]]
+          python - <<'PY'
+          import hashlib
+          import json
+          import os
+          import time
+          import urllib.request
+          from pathlib import Path
+
+          expected = {
+              "SHA256SUMS",
+              "RELEASE-MANIFEST.json",
+              "dailyaiagents_evidence_gate-0.1.0-py3-none-any.whl",
+              "dailyaiagents_evidence_gate-0.1.0.tar.gz",
+              "evidence-gate.sbom.cdx.json",
+              "dailyaiagents_release_gate-0.1.0-py3-none-any.whl",
+              "dailyaiagents_release_gate-0.1.0.tar.gz",
+              "release-gate.sbom.cdx.json",
+              "daily-ai-agent-toolkit-demo-v0.1.0.mp4",
+              "daily-ai-agent-toolkit-demo-v0.1.0.srt",
+              "DEMO-TRANSCRIPT.md",
+              "TECHNICAL-REPORT.md",
+              "evidence-gate.server.json",
+              "release-gate.server.json",
+              "evidence-gate-provenance.sigstore.json",
+              "release-gate-provenance.sigstore.json",
+              "PROVENANCE-SHA256SUMS",
+              f"daily-ai-agent-toolkit-{os.environ['RELEASE_TAG']}-release-bundle.tar.gz",
+          }
+          release = json.loads(Path("dist/release.json").read_text())
+          if release.get("tag_name") != os.environ["RELEASE_TAG"]:
+              raise SystemExit("release tag mismatch")
+          if release.get("immutable") is not True:
+              raise SystemExit("release is not immutable")
+          if release.get("draft") or release.get("prerelease"):
+              raise SystemExit("release is not final")
+          assets = release.get("assets", [])
+          names = {asset.get("name") for asset in assets}
+          if names != expected or len(assets) != len(expected):
+              raise SystemExit(
+                  f"release asset mismatch: missing={sorted(expected - names)}, "
+                  f"unexpected={sorted(names - expected)}"
+              )
+          output = Path("dist/public-assets")
+          for asset in assets:
+              name = asset["name"]
+              destination = output / name
+              expected_size = asset.get("size")
+              if not isinstance(expected_size, int) or not 0 < expected_size <= 536_870_912:
+                  raise SystemExit(f"invalid or excessive GitHub asset size for {name}")
+              for attempt in range(1, 4):
+                  try:
+                      digest = hashlib.sha256()
+                      received = 0
+                      with urllib.request.urlopen(
+                          asset["browser_download_url"], timeout=60
+                      ) as response, destination.open("wb") as handle:
+                          while chunk := response.read(1024 * 1024):
+                              received += len(chunk)
+                              if received > expected_size:
+                                  raise RuntimeError(f"oversized GitHub asset: {name}")
+                              digest.update(chunk)
+                              handle.write(chunk)
+                      if received != expected_size:
+                          raise RuntimeError(f"truncated GitHub asset: {name}")
+                      break
+                  except Exception:
+                      destination.unlink(missing_ok=True)
+                      if attempt == 3:
+                          raise
+                      time.sleep(2)
+              actual = "sha256:" + digest.hexdigest()
+              if asset.get("digest") != actual:
+                  raise SystemExit(f"GitHub API digest mismatch for {name}")
+          print(f"anonymous GitHub asset verification PASS: {len(assets)}/{len(expected)}")
+          PY
+          for asset in dist/public-assets/*; do
+            gh release verify-asset "${RELEASE_TAG}" "${asset}" \
+              --repo "${GITHUB_REPOSITORY}"
+          done
+          (cd dist/public-assets && sha256sum --check PROVENANCE-SHA256SUMS)
+          cp "dist/public-assets/daily-ai-agent-toolkit-${RELEASE_TAG}-release-bundle.tar.gz" \
+            dist/download/
           tar -xzf dist/download/*.tar.gz -C dist/download
           (cd dist/download/release && sha256sum --check SHA256SUMS)
           for artifact in dist/download/release/evidence-gate/*.whl \
             dist/download/release/evidence-gate/*.tar.gz \
             dist/download/release/release-gate/*.whl \
             dist/download/release/release-gate/*.tar.gz; do
-            gh attestation verify "$artifact" --repo "${GITHUB_REPOSITORY}" --deny-self-hosted-runners
+            gh attestation verify "$artifact" \
+              --repo "${GITHUB_REPOSITORY}" \
+              --signer-workflow "${GITHUB_REPOSITORY}/.github/workflows/release-evidence.yml" \
+              --signer-digest "${WORKFLOW_CONFIG_SHA}" \
+              --source-ref "${GITHUB_REF}" \
+              --source-digest "${GITHUB_SHA}" \
+              --deny-self-hosted-runners
           done
