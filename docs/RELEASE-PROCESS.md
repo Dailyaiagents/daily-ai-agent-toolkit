@@ -16,4 +16,27 @@ If one immutable PyPI package publishes and the other fails, preserve the succes
 
 Post-release verification downloads the public release bundle, checks every manifest digest, and verifies GitHub build provenance for both wheels and both source distributions. Public PyPI verification separately downloads with cache disabled, compares exact digest and size, verifies PEP 740 attestations, installs the hash-locked runtime plus each wheel with `--no-deps`, and discovers exactly four tools per server.
 
+If a tag-triggered workflow fails before any public artifact is created, the tag
+is not moved or recreated. A reviewed workflow on protected `main` may resume
+the existing tag through `workflow_dispatch` only after it independently:
+
+- resolves the annotated tag through GitHub's API and verifies its signature,
+  target, protected-main ancestry, and exact successful CI workflow run;
+- checks out the target SHA and cryptographically verifies the tag with the
+  repository-pinned release-signing public key;
+- binds every workflow artifact name to the target SHA; and
+- produces custom SLSA v1 provenance that records the signed tag source and the
+  separate protected workflow configuration commit without conflating them.
+
+The four publication environments admit both `v*` tag runs and protected
+`main` resume runs. Required review, self-review prevention, and disabled
+administrator bypass apply to both paths. See
+[`RELEASE-RESUME-PROVENANCE.md`](RELEASE-RESUME-PROVENANCE.md) for the predicate
+contract.
+
+After MCP publication, both public registry records are fetched anonymously and
+matched to the fixed manifests. Final GitHub verification requires the complete
+asset inventory, anonymous digest equality, the immutable-release attestation,
+the exact tag target, package provenance, and bundle checksums.
+
 PyPI and GitHub do not permit replacing immutable version bytes. Any source correction after publication requires a new version and a new tag; it is never repaired by overwriting `0.1.0`.
