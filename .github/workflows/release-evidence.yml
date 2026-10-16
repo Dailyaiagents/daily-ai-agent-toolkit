@@ -169,7 +169,7 @@ jobs:
       RELEASE_TAG_OBJECT_SHA: ${{ needs.resolve-release.outputs.tag_object_sha }}
       RELEASE_TARGET_SHA: ${{ needs.resolve-release.outputs.target_sha }}
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.resolve-release.outputs.target_sha }}
           fetch-depth: 1
@@ -186,7 +186,7 @@ jobs:
           allowed_signers="${RUNNER_TEMP}/release-allowed-signers"
           printf '%s %s\n' "${RELEASE_SIGNER_PRINCIPAL}" "${RELEASE_SIGNER_PUBLIC_KEY}" > "${allowed_signers}"
           git -c gpg.ssh.allowedSignersFile="${allowed_signers}" verify-tag "${RELEASE_TAG}"
-      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: Install hash-locked release and runtime environments
@@ -224,13 +224,13 @@ jobs:
           mkdir -p dist/pypi/evidence-gate dist/pypi/release-gate
           cp dist/release/evidence-gate/*.whl dist/release/evidence-gate/*.tar.gz dist/pypi/evidence-gate/
           cp dist/release/release-gate/*.whl dist/release/release-gate/*.tar.gz dist/pypi/release-gate/
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: toolkit-release-${{ needs.resolve-release.outputs.target_sha }}
           path: dist/release/
           if-no-files-found: error
           retention-days: 30
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: mcp-publisher-${{ needs.resolve-release.outputs.target_sha }}
           path: |
@@ -238,13 +238,13 @@ jobs:
             dist/mcp-publisher/mcp-publisher.tar.gz
           if-no-files-found: error
           retention-days: 30
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: pypi-evidence-gate-${{ needs.resolve-release.outputs.target_sha }}
           path: dist/pypi/evidence-gate/
           if-no-files-found: error
           retention-days: 30
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: pypi-release-gate-${{ needs.resolve-release.outputs.target_sha }}
           path: dist/pypi/release-gate/
@@ -267,7 +267,7 @@ jobs:
       REPOSITORY_OWNER_ID: ${{ github.repository_owner_id }}
       RUNNER_ENVIRONMENT: github-hosted
     steps:
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: toolkit-release-${{ needs.build.outputs.target_sha }}
           path: dist/release
@@ -420,7 +420,7 @@ jobs:
               raise SystemExit("signed provenance does not bind release source and workflow inputs")
           PY
           done
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: evidence-gate-provenance-${{ needs.build.outputs.target_sha }}
           path: ${{ steps.attest.outputs.bundle-path }}
@@ -442,7 +442,7 @@ jobs:
       REPOSITORY_OWNER_ID: ${{ github.repository_owner_id }}
       RUNNER_ENVIRONMENT: github-hosted
     steps:
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: toolkit-release-${{ needs.build.outputs.target_sha }}
           path: dist/release
@@ -595,7 +595,7 @@ jobs:
               raise SystemExit("signed provenance does not bind release source and workflow inputs")
           PY
           done
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: release-gate-provenance-${{ needs.build.outputs.target_sha }}
           path: ${{ steps.attest.outputs.bundle-path }}
@@ -611,15 +611,15 @@ jobs:
     env:
       RELEASE_VERSION: ${{ needs.build.outputs.release_version }}
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.build.outputs.target_sha }}
           fetch-depth: 1
           persist-credentials: false
-      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: toolkit-release-${{ needs.build.outputs.target_sha }}
           path: dist/release
@@ -643,7 +643,7 @@ jobs:
       id-token: write
       contents: read
     steps:
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: pypi-evidence-gate-${{ needs.build.outputs.target_sha }}
           path: dist/pypi/evidence-gate
@@ -664,15 +664,15 @@ jobs:
     env:
       RELEASE_VERSION: ${{ needs.build.outputs.release_version }}
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.build.outputs.target_sha }}
           fetch-depth: 1
           persist-credentials: false
-      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: toolkit-release-${{ needs.build.outputs.target_sha }}
           path: dist/release
@@ -696,7 +696,7 @@ jobs:
       id-token: write
       contents: read
     steps:
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: pypi-release-gate-${{ needs.build.outputs.target_sha }}
           path: dist/pypi/release-gate
@@ -727,15 +727,15 @@ jobs:
     env:
       RELEASE_VERSION: ${{ needs.build.outputs.release_version }}
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.build.outputs.target_sha }}
           fetch-depth: 1
           persist-credentials: false
-      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: toolkit-release-${{ needs.build.outputs.target_sha }}
           path: dist/release
@@ -757,11 +757,11 @@ jobs:
     permissions:
       id-token: write
     steps:
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: toolkit-release-${{ needs.build.outputs.target_sha }}
           path: dist/release
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: mcp-publisher-${{ needs.build.outputs.target_sha }}
           path: dist/mcp-publisher
@@ -779,11 +779,11 @@ jobs:
     permissions:
       id-token: write
     steps:
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: toolkit-release-${{ needs.build.outputs.target_sha }}
           path: dist/release
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: mcp-publisher-${{ needs.build.outputs.target_sha }}
           path: dist/mcp-publisher
@@ -802,7 +802,7 @@ jobs:
     env:
       RELEASE_VERSION: ${{ needs.build.outputs.release_version }}
     steps:
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: toolkit-release-${{ needs.build.outputs.target_sha }}
           path: dist/release
@@ -875,15 +875,15 @@ jobs:
       RELEASE_TARGET_SHA: ${{ needs.build.outputs.target_sha }}
       WORKFLOW_CONFIG_SHA: ${{ github.workflow_sha }}
     steps:
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: toolkit-release-${{ needs.build.outputs.target_sha }}
           path: dist/release
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: evidence-gate-provenance-${{ needs.build.outputs.target_sha }}
           path: dist/provenance/evidence-gate
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: release-gate-provenance-${{ needs.build.outputs.target_sha }}
           path: dist/provenance/release-gate
