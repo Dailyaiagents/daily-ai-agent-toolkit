@@ -1,8 +1,8 @@
-build==1.6.0
-cyclonedx-bom==7.1.0
-hatchling==1.27.0
-pillow==11.3.0
+build==1.6.1
+cyclonedx-bom==7.6.0
+hatchling==1.33.0
+pillow==13.0.0
 pip-audit==2.10.1
-pypi-attestations==0.0.30
-pytest==8.3.5
-zizmor==1.29.0
+pypi-attestations==0.0.31
+pytest==9.2.0
+zizmor==1.32.0
